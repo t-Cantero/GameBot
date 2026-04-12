@@ -131,14 +131,21 @@ function resize() {
 
   SIZE = Math.floor(maxW / COLS);
 
+  // tamaño visual (CSS)
   canvas.style.width = (SIZE * COLS) + "px";
   canvas.style.height = (SIZE * ROWS) + "px";
 
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = (SIZE * COLS) * dpr;
-  canvas.height = (SIZE * ROWS) * dpr;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // tamaño real del canvas (PIXELS)
+  canvas.width = SIZE * COLS * dpr;
+  canvas.height = SIZE * ROWS * dpr;
+
+  // RESET CRÍTICO (esto evita el bug que ves)
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // escalar una sola vez
+  ctx.scale(dpr, dpr);
 }
 
 window.addEventListener("resize", resize);
