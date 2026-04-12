@@ -16,21 +16,28 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow: hidden;
 }
 
+/* HUD */
+#hud {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* CANVAS */
 #board {
   background: #050510;
   border: 2px solid #00f5ff;
   margin-top: 10px;
+  touch-action: none;
 }
 
-#hud {
-  display: flex;
-  gap: 20px;
-  margin-top: 10px;
-  font-size: 14px;
-}
-
+/* OVERLAY */
 #overlay {
   position: fixed;
   inset: 0;
@@ -40,12 +47,27 @@ body {
   justify-content: center;
   align-items: center;
   gap: 15px;
+  z-index: 10;
 }
 
 button {
   padding: 10px 20px;
   font-family: monospace;
   cursor: pointer;
+}
+
+/* CONTROLES MÓVILES */
+#controls {
+  position: fixed;
+  bottom: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.ctrl-btn {
+  width: 60px;
+  height: 60px;
+  font-size: 20px;
 }
 </style>
 </head>
@@ -64,7 +86,15 @@ button {
   <div>TIME: <span id="time">00:00</span></div>
 </div>
 
-<canvas id="board" width="300" height="600"></canvas>
+<canvas id="board"></canvas>
+
+<!-- BOTONES MÓVILES -->
+<div id="controls">
+  <button class="ctrl-btn" onclick="move(-1)">⬅</button>
+  <button class="ctrl-btn" onclick="rotatePiece()">⟳</button>
+  <button class="ctrl-btn" onclick="move(1)">➡</button>
+  <button class="ctrl-btn" onclick="drop()">⬇</button>
+</div>
 
 <script>
 const tg = window.Telegram?.WebApp;
@@ -78,7 +108,8 @@ const ctx = canvas.getContext("2d");
 
 const COLS = 10;
 const ROWS = 20;
-const SIZE = 30;
+
+let SIZE = 30;
 
 const PIECES = [
   [[1,1,1,1]],
@@ -93,9 +124,27 @@ let dropCounter = 0;
 let dropInterval = 600;
 let lastTime = 0;
 
-/* =========================
-   GAME CORE
-========================= */
+/* ================= RESPONSIVE CANVAS ================= */
+
+function resize() {
+  const maxW = Math.min(window.innerWidth * 0.95, 360);
+
+  SIZE = Math.floor(maxW / COLS);
+
+  canvas.style.width = (SIZE * COLS) + "px";
+  canvas.style.height = (SIZE * ROWS) + "px";
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = (SIZE * COLS) * dpr;
+  canvas.height = (SIZE * ROWS) * dpr;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+/* ================= GAME ================= */
 
 function newPiece() {
   const p = PIECES[Math.floor(Math.random() * PIECES.length)];
@@ -119,7 +168,6 @@ function collide() {
 
   for (let y = 0; y < p.shape.length; y++) {
     for (let x = 0; x < p.shape[y].length; x++) {
-
       if (!p.shape[y][x]) continue;
 
       const nx = p.x + x;
@@ -129,7 +177,6 @@ function collide() {
       if (ny >= 0 && G.board[ny][nx]) return true;
     }
   }
-
   return false;
 }
 
@@ -145,15 +192,11 @@ function merge() {
   }
 }
 
-/* =========================
-   LIMPIEZA DE LÍNEAS
-========================= */
-
 function clearLines() {
   let linesCleared = 0;
 
   for (let y = ROWS - 1; y >= 0; y--) {
-    if (G.board[y].every(cell => cell === 1)) {
+    if (G.board[y].every(v => v === 1)) {
       G.board.splice(y, 1);
       G.board.unshift(Array(COLS).fill(0));
       linesCleared++;
@@ -161,22 +204,16 @@ function clearLines() {
     }
   }
 
-  if (linesCleared > 0) {
+  if (linesCleared) {
     G.lines += linesCleared;
 
-    // puntuación estilo Tetris básico
     const points = [0, 100, 300, 500, 800];
     G.score += points[linesCleared] || linesCleared * 200;
 
-    // nivel
     G.level = Math.floor(G.lines / 10) + 1;
-
-    // velocidad
-    dropInterval = Math.max(100, 600 - (G.level - 1) * 50);
+    dropInterval = Math.max(120, 600 - (G.level - 1) * 50);
   }
 }
-
-/* ========================= */
 
 function resetPiece() {
   G.cur = newPiece();
@@ -185,7 +222,6 @@ function resetPiece() {
 
 function drop() {
   G.cur.y++;
-
   if (collide()) {
     G.cur.y--;
     merge();
@@ -194,45 +230,35 @@ function drop() {
   }
 }
 
-/* =========================
-   ROTACIÓN
-========================= */
+function move(dir) {
+  G.cur.x += dir;
+  if (collide()) G.cur.x -= dir;
+}
 
 function rotate(matrix) {
-  const N = matrix.length;
-  const M = matrix[0].length;
-  const result = [];
-
-  for (let x = 0; x < M; x++) {
-    result[x] = [];
-    for (let y = N - 1; y >= 0; y--) {
-      result[x].push(matrix[y][x]);
+  const res = [];
+  for (let x = 0; x < matrix[0].length; x++) {
+    res[x] = [];
+    for (let y = matrix.length - 1; y >= 0; y--) {
+      res[x].push(matrix[y][x]);
     }
   }
-
-  return result;
+  return res;
 }
 
 function rotatePiece() {
-  const oldShape = G.cur.shape;
-  const rotated = rotate(oldShape);
-
+  const old = G.cur.shape;
+  const rotated = rotate(old);
   G.cur.shape = rotated;
-
-  if (collide()) {
-    G.cur.shape = oldShape;
-  }
+  if (collide()) G.cur.shape = old;
 }
 
-/* =========================
-   RENDER
-========================= */
+/* ================= DRAW ================= */
 
 function draw() {
   ctx.fillStyle = "#050510";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // board
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       if (G.board[y][x]) {
@@ -242,7 +268,6 @@ function draw() {
     }
   }
 
-  // piece
   const p = G.cur;
   ctx.fillStyle = "#ff0";
 
@@ -266,15 +291,12 @@ function updateHUD() {
   document.getElementById("level").textContent = G.level;
 
   const t = Math.floor((Date.now() - G.start) / 1000);
-  const m = String(Math.floor(t / 60)).padStart(2, "0");
-  const s = String(t % 60).padStart(2, "0");
-
-  document.getElementById("time").textContent = `${m}:${s}`;
+  document.getElementById("time").textContent =
+    String(Math.floor(t / 60)).padStart(2,"0") + ":" +
+    String(t % 60).padStart(2,"0");
 }
 
-/* =========================
-   LOOP
-========================= */
+/* ================= LOOP ================= */
 
 function loop(time = 0) {
   if (!G?.running) return;
@@ -283,7 +305,6 @@ function loop(time = 0) {
   lastTime = time;
 
   dropCounter += delta;
-
   if (dropCounter > dropInterval) {
     drop();
     dropCounter = 0;
@@ -295,25 +316,18 @@ function loop(time = 0) {
   requestAnimationFrame(loop);
 }
 
-/* =========================
-   CONTROL
-========================= */
+/* ================= CONTROLES ================= */
 
 document.addEventListener("keydown", e => {
   if (!G?.running) return;
 
-  if (e.key === "ArrowLeft") G.cur.x--;
-  if (e.key === "ArrowRight") G.cur.x++;
+  if (e.key === "ArrowLeft") move(-1);
+  if (e.key === "ArrowRight") move(1);
   if (e.key === "ArrowDown") drop();
   if (e.key === "ArrowUp") rotatePiece();
-
-  if (collide()) {
-    if (e.key === "ArrowLeft") G.cur.x++;
-    if (e.key === "ArrowRight") G.cur.x--;
-  }
 });
 
-/* ========================= */
+/* ================= GAME STATE ================= */
 
 function startGame() {
   document.getElementById("overlay").style.display = "none";
@@ -326,14 +340,12 @@ function startGame() {
 function endGame() {
   G.running = false;
 
-  const data = {
+  window.finalData = {
     score: G.score,
     tiempo: document.getElementById("time").textContent,
     nivel: G.level,
     lineas: G.lines
   };
-
-  window.finalData = data;
 
   document.getElementById("overlay").innerHTML = `
     <h2>GAME OVER</h2>
@@ -345,11 +357,8 @@ function endGame() {
 }
 
 function sendData() {
-  if (tg?.sendData) {
-    tg.sendData(JSON.stringify(window.finalData));
-  } else {
-    alert(JSON.stringify(window.finalData));
-  }
+  if (tg?.sendData) tg.sendData(JSON.stringify(window.finalData));
+  else alert(JSON.stringify(window.finalData));
 }
 </script>
 
