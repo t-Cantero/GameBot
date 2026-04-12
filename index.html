@@ -53,7 +53,7 @@ button {
 <body>
 
 <div id="overlay">
-  <h1>TETRIS</h1>
+  <h1>TETRIS PRO</h1>
   <button onclick="startGame()">JUGAR</button>
 </div>
 
@@ -189,7 +189,7 @@ function drop() {
   if (collide()) {
     G.cur.y--;
     merge();
-    clearLines(); // 👈 IMPORTANTE
+    clearLines();
     resetPiece();
   }
 }
