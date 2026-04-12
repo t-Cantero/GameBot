@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>TETRIS</title>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    :root {
+      --bg: #0a0a0f;
+      --panel: #12121a;
+      --border: #2a2a3a;
+      --cyan: #00f5ff;
+      --yellow: #ffe600;
+      --purple: #bf00ff;
+      --green: #00ff6a;
+      --red: #ff2d55;
+      --orange: #ff6a00;
+      --blue: #1a6aff;
+      --ghost: rgba(255,255,255,0.07);
+      --text: #e0e0ff;
+      --dim: #555577;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'Press Start 2P', monospace;
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* SCANLINES */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.15) 2px,
+        rgba(0,0,0,0.15) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    #wrapper {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    #game-canvas {
+      border: 3px solid var(--cyan);
+      box-shadow: 0 0 20px var(--cyan);
+      image-rendering: pixelated;
+    }
+
+    #side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 90px;
+    }
+
+    .panel-box {
+      background: var(--panel);
+      border: 2px solid var(--border);
+      padding: 8px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-label {
+      font-size: 5px;
+      color: var(--dim);
+    }
+
+    .panel-value {
+      font-size: 8px;
+      color: var(--yellow);
+    }
+
+    #controls {
+      display: grid;
+      grid-template-columns: repeat(3, 56px);
+      grid-template-rows: repeat(2, 52px);
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .btn {
+      background: var(--panel);
+      border: 2px solid var(--border);
+      color: var(--text);
+      font-family: 'Press Start 2P';
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      z-index: 100;
+    }
+
+    #start-btn {
+      background: var(--cyan);
+      color: #000;
+      font-family: 'Press Start 2P';
+      padding: 14px 24px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- OVERLAY -->
+  <div id="overlay">
+    <h1>TETRIS</h1>
+    <div class="sub">
+      ← → MOVER<br>
+      ↑ ROTAR<br>
+      ↓ BAJAR
+    </div>
+    <button id="start-btn" onclick="startGame()">► JUGAR</button>
+  </div>
+
+  <!-- JUEGO -->
+  <div id="wrapper">
+    <canvas id="game-canvas"></canvas>
+
+    <div id="side-panel">
+      <div class="panel-box">
+        <div class="panel-label">SCORE</div>
+        <div class="panel-value" id="score-display">0</div>
+      </div>
+
+      <div class="panel-box">
+        <div class="panel-label">NIVEL</div>
+        <div class="panel-value" id="level-display">1</div>
+      </div>
+
+      <div class="panel-box">
+        <div class="panel-label">TIEMPO</div>
+        <div id="timer-display">00:00</div>
+      </div>
+
+      <div class="panel-box">
+        <div class="panel-label">NEXT</div>
+        <canvas id="next-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROLES -->
+  <div id="controls">
+    <button class="btn" onclick="e_rotate(event)">↑</button>
+    <button class="btn" onclick="e_left(event)">←</button>
+    <button class="btn" onclick="e_down(event)">↓</button>
+    <button class="btn" onclick="e_right(event)">→</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+
+    const COLS = 10;
+    const ROWS = 20;
+
+    let state = null;
+
+    function newState() {
+      return {
+        board: Array.from({ length: ROWS }, () => Array(COLS).fill(null)),
+        score: 0,
+        level: 1
+      };
+    }
+
+    function startGame() {
+      document.getElementById('overlay').style.display = 'none';
+      state = newState();
+    }
+
+    function e_left() {
+      console.log("LEFT");
+    }
+
+    function e_right() {
+      console.log("RIGHT");
+    }
+
+    function e_down() {
+      console.log("DOWN");
+    }
+
+    function e_rotate() {
+      console.log("ROTATE");
+    }
+  </script>
+
+</body>
+</html>
