@@ -1,352 +1,258 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>TETRIS</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>TETRIS PRO</title>
 
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+<style>
+body {
+  margin: 0;
+  background: #0d0d1a;
+  color: white;
+  font-family: monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      touch-action: manipulation;
-    }
+#board {
+  background: #050510;
+  border: 2px solid #00f5ff;
+  margin-top: 10px;
+}
 
-    body {
-      background: #0d0d1a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      min-height: 100dvh;
-      font-family: 'Press Start 2P', monospace;
-      color: #eee;
-      overflow: hidden;
-      padding-top: 8px;
-    }
+#hud {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+  font-size: 14px;
+}
 
-    #topbar {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 6px;
-      font-size: 8px;
-    }
+#overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
 
-    .stat { text-align: center; }
-
-    .stat-label {
-      color: #555;
-      font-size: 6px;
-      margin-bottom: 2px;
-    }
-
-    .stat-val {
-      color: #ffe600;
-      text-shadow: 0 0 6px #ffe600;
-    }
-
-    #game-wrap {
-      display: flex;
-      gap: 8px;
-      align-items: flex-start;
-    }
-
-    canvas#board {
-      border: 2px solid #00f5ff;
-      box-shadow: 0 0 12px #00f5ff55;
-      display: block;
-      image-rendering: pixelated;
-    }
-
-    #side {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      font-size: 7px;
-    }
-
-    .side-box {
-      border: 1px solid #222;
-      padding: 6px;
-      text-align: center;
-      background: #111;
-    }
-
-    .side-box .lbl {
-      color: #444;
-      font-size: 5px;
-      margin-bottom: 4px;
-    }
-
-    #next-canvas {
-      image-rendering: pixelated;
-      display: block;
-      margin: 0 auto;
-    }
-
-    #controls {
-      display: grid;
-      grid-template-columns: repeat(3, 56px);
-      grid-template-rows: repeat(2, 52px);
-      gap: 6px;
-      margin-top: 8px;
-    }
-
-    .cbtn {
-      background: #111;
-      border: 1px solid #333;
-      border-radius: 4px;
-      color: #ccc;
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .cbtn:active {
-      background: #1a2a2a;
-      border-color: #00f5ff;
-    }
-
-    #overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.88);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-      z-index: 50;
-      text-align: center;
-      padding: 20px;
-    }
-
-    #overlay h1 {
-      font-size: 28px;
-      color: #00f5ff;
-      text-shadow: 0 0 16px #00f5ff;
-      animation: blink 1s step-end infinite;
-    }
-
-    .ov-result {
-      font-size: 9px;
-      color: #ffe600;
-      line-height: 2.2;
-    }
-
-    .ov-sub {
-      font-size: 7px;
-      color: #555;
-      line-height: 2;
-    }
-
-    .play-btn {
-      background: #00f5ff;
-      color: #000;
-      border: none;
-      font-family: 'Press Start 2P', monospace;
-      font-size: 9px;
-      padding: 14px 28px;
-      cursor: pointer;
-      letter-spacing: 2px;
-      box-shadow: 0 0 16px #00f5ff;
-    }
-
-    .play-btn:active {
-      transform: scale(0.96);
-    }
-
-    .retry-btn {
-      background: #1a1a1a;
-      color: #888;
-      border: 1px solid #333;
-      font-family: 'Press Start 2P', monospace;
-      font-size: 8px;
-      padding: 10px 20px;
-      cursor: pointer;
-    }
-
-    @keyframes blink {
-      50% { opacity: 0; }
-    }
-  </style>
+button {
+  padding: 10px 20px;
+  font-family: monospace;
+  cursor: pointer;
+}
+</style>
 </head>
 
 <body>
 
-  <div id="overlay">
-    <h1>TETRIS</h1>
-    <div class="ov-sub">
-      ARRIBA: rotar &nbsp; ABAJO: bajar<br>
-      IZQ / DER: mover
-    </div>
-    <button class="play-btn" id="btnPlay">JUGAR</button>
-  </div>
+<div id="overlay">
+  <h1>TETRIS PRO</h1>
+  <button onclick="startGame()">JUGAR</button>
+</div>
 
-  <div id="topbar">
-    <div class="stat">
-      <div class="stat-label">SCORE</div>
-      <div class="stat-val" id="dScore">0</div>
-    </div>
+<div id="hud">
+  <div>SCORE: <span id="score">0</span></div>
+  <div>LINES: <span id="lines">0</span></div>
+  <div>LEVEL: <span id="level">1</span></div>
+  <div>TIME: <span id="time">00:00</span></div>
+</div>
 
-    <div class="stat">
-      <div class="stat-label">NIVEL</div>
-      <div class="stat-val" id="dLevel">1</div>
-    </div>
+<canvas id="board" width="300" height="600"></canvas>
 
-    <div class="stat">
-      <div class="stat-label">LÍNEAS</div>
-      <div class="stat-val" id="dLines">0</div>
-    </div>
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
 
-    <div class="stat">
-      <div class="stat-label">TIEMPO</div>
-      <div class="stat-val" id="dTime">00:00</div>
-    </div>
-  </div>
+const canvas = document.getElementById("board");
+const ctx = canvas.getContext("2d");
 
-  <div id="game-wrap">
-    <canvas id="board"></canvas>
+const COLS = 10;
+const ROWS = 20;
+const SIZE = 30;
 
-    <div id="side">
-      <div class="side-box">
-        <div class="lbl">NEXT</div>
-        <canvas id="next-canvas"></canvas>
-      </div>
-    </div>
-  </div>
+const PIECES = [
+  [[1,1,1,1]],
+  [[1,1],[1,1]],
+  [[0,1,0],[1,1,1]],
+  [[1,0,0],[1,1,1]],
+  [[0,0,1],[1,1,1]]
+];
 
-  <div id="controls">
-    <div></div>
-    <button class="cbtn" id="btn-up">↑</button>
-    <div></div>
+let G = null;
+let dropCounter = 0;
+let dropInterval = 600;
+let lastTime = 0;
+let timer = 0;
 
-    <button class="cbtn" id="btn-left">←</button>
-    <button class="cbtn" id="btn-down">↓</button>
-    <button class="cbtn" id="btn-right">→</button>
-  </div>
+function newPiece() {
+  const p = PIECES[Math.floor(Math.random()*PIECES.length)];
+  return { shape: p, x: 3, y: 0 };
+}
 
-  <script>
-    const tg = window.Telegram?.WebApp;
-    if (tg) { tg.ready(); tg.expand(); }
+function newGame() {
+  return {
+    board: Array.from({length: ROWS}, () => Array(COLS).fill(0)),
+    cur: newPiece(),
+    score: 0,
+    lines: 0,
+    level: 1,
+    running: true,
+    start: Date.now()
+  };
+}
 
-    const boardCanvas = document.getElementById('board');
-    const bCtx = boardCanvas.getContext('2d');
-    const nextCanvas = document.getElementById('next-canvas');
-    const nCtx = nextCanvas.getContext('2d');
+function collide() {
+  const p = G.cur;
+  for (let y=0;y<p.shape.length;y++) {
+    for (let x=0;x<p.shape[y].length;x++) {
+      if (!p.shape[y][x]) continue;
+      let nx = p.x + x;
+      let ny = p.y + y;
 
-    const COLS = 10, ROWS = 20;
-    let B = 24;
-
-    function calcSize() {
-      const availH = window.innerHeight - 200;
-      const availW = (window.innerWidth - 80) * 0.72;
-
-      B = Math.max(16, Math.floor(Math.min(availH / ROWS, availW / COLS)));
-
-      boardCanvas.width = COLS * B;
-      boardCanvas.height = ROWS * B;
-
-      const nb = Math.max(12, Math.floor(B * 0.72));
-      nextCanvas.width = 4 * nb;
-      nextCanvas.height = 4 * nb;
-      nextCanvas._nb = nb;
+      if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+      if (ny >= 0 && G.board[ny][nx]) return true;
     }
+  }
+  return false;
+}
 
-    calcSize();
-    window.addEventListener('resize', () => {
-      calcSize();
-      if (G) renderAll();
-    });
-
-    const DEFS = [
-      { cells: [[0,0],[1,0],[2,0],[3,0]], color:'#00f5ff' },
-      { cells: [[0,0],[1,0],[0,1],[1,1]], color:'#ffe600' },
-      { cells: [[1,0],[0,1],[1,1],[2,1]], color:'#bf00ff' },
-      { cells: [[2,0],[0,1],[1,1],[2,1]], color:'#ff6a00' },
-      { cells: [[0,0],[0,1],[1,1],[2,1]], color:'#1a6aff' },
-      { cells: [[1,0],[2,0],[0,1],[1,1]], color:'#00ff6a' },
-      { cells: [[0,0],[1,0],[1,1],[2,1]], color:'#ff2d55' },
-    ];
-
-    function randPiece() {
-      const d = DEFS[Math.floor(Math.random() * DEFS.length)];
-      return {
-        cells: d.cells.map(c => [...c]),
-        color: d.color,
-        ox: 3,
-        oy: 0
-      };
-    }
-
-    function rotateCells(cells) {
-      const minX = Math.min(...cells.map(c => c[0]));
-      const minY = Math.min(...cells.map(c => c[1]));
-      const maxX = Math.max(...cells.map(c => c[0]));
-      const maxY = Math.max(...cells.map(c => c[1]));
-
-      const cx = (minX + maxX) / 2;
-      const cy = (minY + maxY) / 2;
-
-      return cells.map(([x, y]) => [
-        Math.round(cy - y + cx),
-        Math.round(x - cx + cy)
-      ]);
-    }
-
-    let G = null;
-
-    function newGame() {
-      return {
-        board: Array.from({ length: ROWS }, () => Array(COLS).fill(null)),
-        cur: randPiece(),
-        next: randPiece(),
-        score: 0,
-        level: 1,
-        lines: 0,
-        running: true,
-        t0: Date.now(),
-        elapsed: 0,
-      };
-    }
-
-    function valid(cells, ox, oy, board) {
-      for (const [x, y] of cells) {
-        const nx = ox + x, ny = oy + y;
-        if (nx < 0 || nx >= COLS || ny >= ROWS) return false;
-        if (ny >= 0 && board[ny][nx] !== null) return false;
+function merge() {
+  const p = G.cur;
+  for (let y=0;y<p.shape.length;y++) {
+    for (let x=0;x<p.shape[y].length;x++) {
+      if (p.shape[y][x]) {
+        G.board[p.y+y][p.x+x] = 1;
       }
-      return true;
     }
+  }
+}
 
-    function drop() {
-      if (!G?.running) return;
+function resetPiece() {
+  G.cur = newPiece();
+  if (collide()) endGame();
+}
 
-      if (valid(G.cur.cells, G.cur.ox, G.cur.oy + 1, G.board)) {
-        G.cur.oy++;
-      } else {
-        lock();
+function drop() {
+  G.cur.y++;
+  if (collide()) {
+    G.cur.y--;
+    merge();
+    resetPiece();
+  }
+}
+
+function draw() {
+  ctx.fillStyle = "#050510";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // board
+  for (let y=0;y<ROWS;y++) {
+    for (let x=0;x<COLS;x++) {
+      if (G.board[y][x]) {
+        ctx.fillStyle = "#00f5ff";
+        ctx.fillRect(x*SIZE,y*SIZE,SIZE,SIZE);
       }
-
-      renderAll();
     }
+  }
 
-    function startGame() {
-      document.getElementById('overlay').style.display = 'none';
-      G = newGame();
-      renderAll();
+  // piece
+  const p = G.cur;
+  ctx.fillStyle = "#ff0";
+  for (let y=0;y<p.shape.length;y++) {
+    for (let x=0;x<p.shape[y].length;x++) {
+      if (p.shape[y][x]) {
+        ctx.fillRect((p.x+x)*SIZE,(p.y+y)*SIZE,SIZE,SIZE);
+      }
     }
+  }
+}
 
-    document.getElementById('btnPlay').addEventListener('click', startGame);
-  </script>
+function updateHUD() {
+  document.getElementById("score").textContent = G.score;
+  document.getElementById("lines").textContent = G.lines;
+  document.getElementById("level").textContent = G.level;
+
+  let t = Math.floor((Date.now() - G.start)/1000);
+  let m = String(Math.floor(t/60)).padStart(2,"0");
+  let s = String(t%60).padStart(2,"0");
+  document.getElementById("time").textContent = m+":"+s;
+}
+
+function loop(time=0) {
+  if (!G?.running) return;
+
+  const delta = time - lastTime;
+  lastTime = time;
+
+  dropCounter += delta;
+  if (dropCounter > dropInterval) {
+    drop();
+    dropCounter = 0;
+  }
+
+  draw();
+  updateHUD();
+
+  requestAnimationFrame(loop);
+}
+
+function startGame() {
+  document.getElementById("overlay").style.display = "none";
+  G = newGame();
+  dropCounter = 0;
+  lastTime = 0;
+  requestAnimationFrame(loop);
+}
+
+function endGame() {
+  G.running = false;
+
+  const data = {
+    score: G.score,
+    tiempo: document.getElementById("time").textContent,
+    nivel: G.level,
+    lineas: G.lines
+  };
+
+  document.getElementById("overlay").innerHTML = `
+    <h2>GAME OVER</h2>
+    <button onclick='sendData()'>ENVIAR</button>
+    <button onclick='location.reload()'>REINTENTAR</button>
+  `;
+  document.getElementById("overlay").style.display = "flex";
+
+  window.finalData = data;
+}
+
+function sendData() {
+  if (tg?.sendData) {
+    tg.sendData(JSON.stringify(window.finalData));
+  } else {
+    alert(JSON.stringify(window.finalData));
+  }
+}
+
+document.addEventListener("keydown", e => {
+  if (!G?.running) return;
+
+  if (e.key === "ArrowLeft") G.cur.x--;
+  if (e.key === "ArrowRight") G.cur.x++;
+  if (e.key === "ArrowDown") drop();
+
+  if (collide()) {
+    if (e.key === "ArrowLeft") G.cur.x++;
+    if (e.key === "ArrowRight") G.cur.x--;
+  }
+});
+
+</script>
 
 </body>
 </html>
