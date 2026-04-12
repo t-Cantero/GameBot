@@ -55,20 +55,6 @@ button {
   font-family: monospace;
   cursor: pointer;
 }
-
-/* CONTROLES MÓVILES */
-#controls {
-  position: fixed;
-  bottom: 10px;
-  display: flex;
-  gap: 10px;
-}
-
-.ctrl-btn {
-  width: 60px;
-  height: 60px;
-  font-size: 20px;
-}
 </style>
 </head>
 
@@ -87,14 +73,6 @@ button {
 </div>
 
 <canvas id="board"></canvas>
-
-<!-- BOTONES MÓVILES -->
-<div id="controls">
-  <button class="ctrl-btn" onclick="move(-1)">⬅</button>
-  <button class="ctrl-btn" onclick="rotatePiece()">⟳</button>
-  <button class="ctrl-btn" onclick="move(1)">➡</button>
-  <button class="ctrl-btn" onclick="drop()">⬇</button>
-</div>
 
 <script>
 const tg = window.Telegram?.WebApp;
@@ -124,27 +102,22 @@ let dropCounter = 0;
 let dropInterval = 600;
 let lastTime = 0;
 
-/* ================= RESPONSIVE CANVAS ================= */
+/* ================= RESPONSIVE ================= */
 
 function resize() {
   const maxW = Math.min(window.innerWidth * 0.95, 360);
 
   SIZE = Math.floor(maxW / COLS);
 
-  // tamaño visual (CSS)
   canvas.style.width = (SIZE * COLS) + "px";
   canvas.style.height = (SIZE * ROWS) + "px";
 
   const dpr = window.devicePixelRatio || 1;
 
-  // tamaño real del canvas (PIXELS)
   canvas.width = SIZE * COLS * dpr;
   canvas.height = SIZE * ROWS * dpr;
 
-  // RESET CRÍTICO (esto evita el bug que ves)
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-  // escalar una sola vez
   ctx.scale(dpr, dpr);
 }
 
@@ -323,7 +296,7 @@ function loop(time = 0) {
   requestAnimationFrame(loop);
 }
 
-/* ================= CONTROLES ================= */
+/* ================= KEYBOARD (PC) ================= */
 
 document.addEventListener("keydown", e => {
   if (!G?.running) return;
@@ -334,7 +307,54 @@ document.addEventListener("keydown", e => {
   if (e.key === "ArrowUp") rotatePiece();
 });
 
-/* ================= GAME STATE ================= */
+/* ================= TOUCH CONTROLS ================= */
+
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartTime = 0;
+
+const SWIPE_THRESHOLD = 30;
+const SWIPE_VERTICAL = 40;
+const TAP_MAX_TIME = 180;
+const TAP_MAX_MOVE = 10;
+
+canvas.addEventListener("touchstart", (e) => {
+  const t = e.touches[0];
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+  touchStartTime = Date.now();
+}, { passive: true });
+
+canvas.addEventListener("touchend", (e) => {
+  if (!G?.running) return;
+
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStartX;
+  const dy = t.clientY - touchStartY;
+
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  const dt = Date.now() - touchStartTime;
+
+  // TAP = rotar
+  if (dt < TAP_MAX_TIME && absX < TAP_MAX_MOVE && absY < TAP_MAX_MOVE) {
+    rotatePiece();
+    return;
+  }
+
+  // swipe horizontal
+  if (absX > absY && absX > SWIPE_THRESHOLD) {
+    move(dx > 0 ? 1 : -1);
+    return;
+  }
+
+  // swipe abajo
+  if (absY > SWIPE_VERTICAL && dy > 0) {
+    drop();
+  }
+});
+
+/* ================= STATE ================= */
 
 function startGame() {
   document.getElementById("overlay").style.display = "none";
