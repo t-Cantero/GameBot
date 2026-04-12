@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>TETRIS PRO</title>
+<title>TETRIS</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
@@ -68,7 +68,10 @@ button {
 
 <script>
 const tg = window.Telegram?.WebApp;
-if (tg) { tg.ready(); tg.expand(); }
+if (tg) {
+  tg.ready();
+  tg.expand();
+}
 
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
@@ -89,16 +92,19 @@ let G = null;
 let dropCounter = 0;
 let dropInterval = 600;
 let lastTime = 0;
-let timer = 0;
 
 function newPiece() {
-  const p = PIECES[Math.floor(Math.random()*PIECES.length)];
-  return { shape: p, x: 3, y: 0 };
+  const p = PIECES[Math.floor(Math.random() * PIECES.length)];
+  return {
+    shape: p,
+    x: 3,
+    y: 0
+  };
 }
 
 function newGame() {
   return {
-    board: Array.from({length: ROWS}, () => Array(COLS).fill(0)),
+    board: Array.from({ length: ROWS }, () => Array(COLS).fill(0)),
     cur: newPiece(),
     score: 0,
     lines: 0,
@@ -110,25 +116,30 @@ function newGame() {
 
 function collide() {
   const p = G.cur;
-  for (let y=0;y<p.shape.length;y++) {
-    for (let x=0;x<p.shape[y].length;x++) {
+
+  for (let y = 0; y < p.shape.length; y++) {
+    for (let x = 0; x < p.shape[y].length; x++) {
+
       if (!p.shape[y][x]) continue;
-      let nx = p.x + x;
-      let ny = p.y + y;
+
+      const nx = p.x + x;
+      const ny = p.y + y;
 
       if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
       if (ny >= 0 && G.board[ny][nx]) return true;
     }
   }
+
   return false;
 }
 
 function merge() {
   const p = G.cur;
-  for (let y=0;y<p.shape.length;y++) {
-    for (let x=0;x<p.shape[y].length;x++) {
+
+  for (let y = 0; y < p.shape.length; y++) {
+    for (let x = 0; x < p.shape[y].length; x++) {
       if (p.shape[y][x]) {
-        G.board[p.y+y][p.x+x] = 1;
+        G.board[p.y + y][p.x + x] = 1;
       }
     }
   }
@@ -141,6 +152,7 @@ function resetPiece() {
 
 function drop() {
   G.cur.y++;
+
   if (collide()) {
     G.cur.y--;
     merge();
@@ -148,27 +160,65 @@ function drop() {
   }
 }
 
+/* =========================
+   ROTACIÓN
+========================= */
+
+function rotate(matrix) {
+  const N = matrix.length;
+  const M = matrix[0].length;
+  const result = [];
+
+  for (let x = 0; x < M; x++) {
+    result[x] = [];
+    for (let y = N - 1; y >= 0; y--) {
+      result[x].push(matrix[y][x]);
+    }
+  }
+
+  return result;
+}
+
+function rotatePiece() {
+  const oldShape = G.cur.shape;
+  const rotated = rotate(oldShape);
+
+  G.cur.shape = rotated;
+
+  if (collide()) {
+    G.cur.shape = oldShape;
+  }
+}
+
+/* ========================= */
+
 function draw() {
   ctx.fillStyle = "#050510";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // board
-  for (let y=0;y<ROWS;y++) {
-    for (let x=0;x<COLS;x++) {
+  // tablero
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
       if (G.board[y][x]) {
         ctx.fillStyle = "#00f5ff";
-        ctx.fillRect(x*SIZE,y*SIZE,SIZE,SIZE);
+        ctx.fillRect(x * SIZE, y * SIZE, SIZE, SIZE);
       }
     }
   }
 
-  // piece
+  // pieza
   const p = G.cur;
   ctx.fillStyle = "#ff0";
-  for (let y=0;y<p.shape.length;y++) {
-    for (let x=0;x<p.shape[y].length;x++) {
+
+  for (let y = 0; y < p.shape.length; y++) {
+    for (let x = 0; x < p.shape[y].length; x++) {
       if (p.shape[y][x]) {
-        ctx.fillRect((p.x+x)*SIZE,(p.y+y)*SIZE,SIZE,SIZE);
+        ctx.fillRect(
+          (p.x + x) * SIZE,
+          (p.y + y) * SIZE,
+          SIZE,
+          SIZE
+        );
       }
     }
   }
@@ -179,19 +229,21 @@ function updateHUD() {
   document.getElementById("lines").textContent = G.lines;
   document.getElementById("level").textContent = G.level;
 
-  let t = Math.floor((Date.now() - G.start)/1000);
-  let m = String(Math.floor(t/60)).padStart(2,"0");
-  let s = String(t%60).padStart(2,"0");
-  document.getElementById("time").textContent = m+":"+s;
+  const t = Math.floor((Date.now() - G.start) / 1000);
+  const m = String(Math.floor(t / 60)).padStart(2, "0");
+  const s = String(t % 60).padStart(2, "0");
+
+  document.getElementById("time").textContent = `${m}:${s}`;
 }
 
-function loop(time=0) {
+function loop(time = 0) {
   if (!G?.running) return;
 
   const delta = time - lastTime;
   lastTime = time;
 
   dropCounter += delta;
+
   if (dropCounter > dropInterval) {
     drop();
     dropCounter = 0;
@@ -205,9 +257,11 @@ function loop(time=0) {
 
 function startGame() {
   document.getElementById("overlay").style.display = "none";
+
   G = newGame();
   dropCounter = 0;
   lastTime = 0;
+
   requestAnimationFrame(loop);
 }
 
@@ -221,14 +275,15 @@ function endGame() {
     lineas: G.lines
   };
 
+  window.finalData = data;
+
   document.getElementById("overlay").innerHTML = `
     <h2>GAME OVER</h2>
-    <button onclick='sendData()'>ENVIAR</button>
-    <button onclick='location.reload()'>REINTENTAR</button>
+    <button onclick="sendData()">ENVIAR</button>
+    <button onclick="location.reload()">REINTENTAR</button>
   `;
-  document.getElementById("overlay").style.display = "flex";
 
-  window.finalData = data;
+  document.getElementById("overlay").style.display = "flex";
 }
 
 function sendData() {
@@ -239,19 +294,23 @@ function sendData() {
   }
 }
 
+/* =========================
+   CONTROLES
+========================= */
+
 document.addEventListener("keydown", e => {
   if (!G?.running) return;
 
   if (e.key === "ArrowLeft") G.cur.x--;
   if (e.key === "ArrowRight") G.cur.x++;
   if (e.key === "ArrowDown") drop();
+  if (e.key === "ArrowUp") rotatePiece();
 
   if (collide()) {
     if (e.key === "ArrowLeft") G.cur.x++;
     if (e.key === "ArrowRight") G.cur.x--;
   }
 });
-
 </script>
 
 </body>
