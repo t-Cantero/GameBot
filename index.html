@@ -93,13 +93,13 @@ let dropCounter = 0;
 let dropInterval = 600;
 let lastTime = 0;
 
+/* =========================
+   GAME CORE
+========================= */
+
 function newPiece() {
   const p = PIECES[Math.floor(Math.random() * PIECES.length)];
-  return {
-    shape: p,
-    x: 3,
-    y: 0
-  };
+  return { shape: p, x: 3, y: 0 };
 }
 
 function newGame() {
@@ -145,6 +145,39 @@ function merge() {
   }
 }
 
+/* =========================
+   LIMPIEZA DE LÍNEAS
+========================= */
+
+function clearLines() {
+  let linesCleared = 0;
+
+  for (let y = ROWS - 1; y >= 0; y--) {
+    if (G.board[y].every(cell => cell === 1)) {
+      G.board.splice(y, 1);
+      G.board.unshift(Array(COLS).fill(0));
+      linesCleared++;
+      y++;
+    }
+  }
+
+  if (linesCleared > 0) {
+    G.lines += linesCleared;
+
+    // puntuación estilo Tetris básico
+    const points = [0, 100, 300, 500, 800];
+    G.score += points[linesCleared] || linesCleared * 200;
+
+    // nivel
+    G.level = Math.floor(G.lines / 10) + 1;
+
+    // velocidad
+    dropInterval = Math.max(100, 600 - (G.level - 1) * 50);
+  }
+}
+
+/* ========================= */
+
 function resetPiece() {
   G.cur = newPiece();
   if (collide()) endGame();
@@ -156,6 +189,7 @@ function drop() {
   if (collide()) {
     G.cur.y--;
     merge();
+    clearLines(); // 👈 IMPORTANTE
     resetPiece();
   }
 }
@@ -190,13 +224,15 @@ function rotatePiece() {
   }
 }
 
-/* ========================= */
+/* =========================
+   RENDER
+========================= */
 
 function draw() {
   ctx.fillStyle = "#050510";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // tablero
+  // board
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       if (G.board[y][x]) {
@@ -206,7 +242,7 @@ function draw() {
     }
   }
 
-  // pieza
+  // piece
   const p = G.cur;
   ctx.fillStyle = "#ff0";
 
@@ -236,6 +272,10 @@ function updateHUD() {
   document.getElementById("time").textContent = `${m}:${s}`;
 }
 
+/* =========================
+   LOOP
+========================= */
+
 function loop(time = 0) {
   if (!G?.running) return;
 
@@ -255,13 +295,31 @@ function loop(time = 0) {
   requestAnimationFrame(loop);
 }
 
+/* =========================
+   CONTROL
+========================= */
+
+document.addEventListener("keydown", e => {
+  if (!G?.running) return;
+
+  if (e.key === "ArrowLeft") G.cur.x--;
+  if (e.key === "ArrowRight") G.cur.x++;
+  if (e.key === "ArrowDown") drop();
+  if (e.key === "ArrowUp") rotatePiece();
+
+  if (collide()) {
+    if (e.key === "ArrowLeft") G.cur.x++;
+    if (e.key === "ArrowRight") G.cur.x--;
+  }
+});
+
+/* ========================= */
+
 function startGame() {
   document.getElementById("overlay").style.display = "none";
-
   G = newGame();
   dropCounter = 0;
   lastTime = 0;
-
   requestAnimationFrame(loop);
 }
 
@@ -293,24 +351,6 @@ function sendData() {
     alert(JSON.stringify(window.finalData));
   }
 }
-
-/* =========================
-   CONTROLES
-========================= */
-
-document.addEventListener("keydown", e => {
-  if (!G?.running) return;
-
-  if (e.key === "ArrowLeft") G.cur.x--;
-  if (e.key === "ArrowRight") G.cur.x++;
-  if (e.key === "ArrowDown") drop();
-  if (e.key === "ArrowUp") rotatePiece();
-
-  if (collide()) {
-    if (e.key === "ArrowLeft") G.cur.x++;
-    if (e.key === "ArrowRight") G.cur.x--;
-  }
-});
 </script>
 
 </body>
