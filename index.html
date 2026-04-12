@@ -8,34 +8,27 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow: hidden;
-  background: #0d0d1a;
-  font-family: monospace;
-  color: white;
-}
-
 body {
+  margin: 0;
+  background: #0d0d1a;
+  color: white;
+  font-family: monospace;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-}
-
-#hud {
-  display: flex;
-  gap: 15px;
-  font-size: 14px;
-  padding: 10px;
 }
 
 #board {
   background: #050510;
   border: 2px solid #00f5ff;
-  display: block;
+  margin-top: 10px;
+}
+
+#hud {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+  font-size: 14px;
 }
 
 #overlay {
@@ -71,11 +64,10 @@ button {
   <div>TIME: <span id="time">00:00</span></div>
 </div>
 
-<canvas id="board"></canvas>
+<canvas id="board" width="300" height="600"></canvas>
 
 <script>
 const tg = window.Telegram?.WebApp;
-
 if (tg) {
   tg.ready();
   tg.expand();
@@ -86,8 +78,7 @@ const ctx = canvas.getContext("2d");
 
 const COLS = 10;
 const ROWS = 20;
-
-let SIZE = 30;
+const SIZE = 30;
 
 const PIECES = [
   [[1,1,1,1]],
@@ -103,25 +94,8 @@ let dropInterval = 600;
 let lastTime = 0;
 
 /* =========================
-   RESPONSIVE
+   GAME CORE
 ========================= */
-
-function resizeGame() {
-  const w = tg?.viewportWidth || window.innerWidth;
-  const h = tg?.viewportHeight || window.innerHeight;
-
-  SIZE = Math.floor(w / COLS);
-
-  canvas.width = COLS * SIZE;
-  canvas.height = ROWS * SIZE;
-
-  canvas.style.width = canvas.width + "px";
-  canvas.style.height = canvas.height + "px";
-}
-
-window.addEventListener("resize", resizeGame);
-
-/* ========================= */
 
 function newPiece() {
   const p = PIECES[Math.floor(Math.random() * PIECES.length)];
@@ -172,14 +146,14 @@ function merge() {
 }
 
 /* =========================
-   LINEAS
+   LIMPIEZA DE LÍNEAS
 ========================= */
 
 function clearLines() {
   let linesCleared = 0;
 
   for (let y = ROWS - 1; y >= 0; y--) {
-    if (G.board[y].every(v => v === 1)) {
+    if (G.board[y].every(cell => cell === 1)) {
       G.board.splice(y, 1);
       G.board.unshift(Array(COLS).fill(0));
       linesCleared++;
@@ -189,8 +163,15 @@ function clearLines() {
 
   if (linesCleared > 0) {
     G.lines += linesCleared;
-    G.score += linesCleared * 100;
+
+    // puntuación estilo Tetris básico
+    const points = [0, 100, 300, 500, 800];
+    G.score += points[linesCleared] || linesCleared * 200;
+
+    // nivel
     G.level = Math.floor(G.lines / 10) + 1;
+
+    // velocidad
     dropInterval = Math.max(100, 600 - (G.level - 1) * 50);
   }
 }
@@ -208,44 +189,50 @@ function drop() {
   if (collide()) {
     G.cur.y--;
     merge();
-    clearLines();
+    clearLines(); // 👈 IMPORTANTE
     resetPiece();
   }
 }
 
 /* =========================
-   ROTACION
+   ROTACIÓN
 ========================= */
 
 function rotate(matrix) {
   const N = matrix.length;
   const M = matrix[0].length;
-  const res = [];
+  const result = [];
 
   for (let x = 0; x < M; x++) {
-    res[x] = [];
+    result[x] = [];
     for (let y = N - 1; y >= 0; y--) {
-      res[x].push(matrix[y][x]);
+      result[x].push(matrix[y][x]);
     }
   }
 
-  return res;
+  return result;
 }
 
 function rotatePiece() {
-  const old = G.cur.shape;
-  const r = rotate(old);
+  const oldShape = G.cur.shape;
+  const rotated = rotate(oldShape);
 
-  G.cur.shape = r;
-  if (collide()) G.cur.shape = old;
+  G.cur.shape = rotated;
+
+  if (collide()) {
+    G.cur.shape = oldShape;
+  }
 }
 
-/* ========================= */
+/* =========================
+   RENDER
+========================= */
 
 function draw() {
   ctx.fillStyle = "#050510";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // board
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       if (G.board[y][x]) {
@@ -255,6 +242,7 @@ function draw() {
     }
   }
 
+  // piece
   const p = G.cur;
   ctx.fillStyle = "#ff0";
 
@@ -278,12 +266,15 @@ function updateHUD() {
   document.getElementById("level").textContent = G.level;
 
   const t = Math.floor((Date.now() - G.start) / 1000);
-  document.getElementById("time").textContent =
-    String(Math.floor(t / 60)).padStart(2,"0") + ":" +
-    String(t % 60).padStart(2,"0");
+  const m = String(Math.floor(t / 60)).padStart(2, "0");
+  const s = String(t % 60).padStart(2, "0");
+
+  document.getElementById("time").textContent = `${m}:${s}`;
 }
 
-/* ========================= */
+/* =========================
+   LOOP
+========================= */
 
 function loop(time = 0) {
   if (!G?.running) return;
@@ -304,7 +295,9 @@ function loop(time = 0) {
   requestAnimationFrame(loop);
 }
 
-/* ========================= */
+/* =========================
+   CONTROL
+========================= */
 
 document.addEventListener("keydown", e => {
   if (!G?.running) return;
@@ -323,33 +316,40 @@ document.addEventListener("keydown", e => {
 /* ========================= */
 
 function startGame() {
-  resizeGame();
-
   document.getElementById("overlay").style.display = "none";
-
   G = newGame();
   dropCounter = 0;
   lastTime = 0;
-
   requestAnimationFrame(loop);
 }
 
 function endGame() {
   G.running = false;
 
-  window.finalData = {
+  const data = {
     score: G.score,
     tiempo: document.getElementById("time").textContent,
     nivel: G.level,
     lineas: G.lines
   };
 
+  window.finalData = data;
+
   document.getElementById("overlay").innerHTML = `
     <h2>GAME OVER</h2>
+    <button onclick="sendData()">ENVIAR</button>
     <button onclick="location.reload()">REINTENTAR</button>
   `;
 
   document.getElementById("overlay").style.display = "flex";
+}
+
+function sendData() {
+  if (tg?.sendData) {
+    tg.sendData(JSON.stringify(window.finalData));
+  } else {
+    alert(JSON.stringify(window.finalData));
+  }
 }
 </script>
 
