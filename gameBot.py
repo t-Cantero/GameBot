@@ -16,6 +16,18 @@ logger = logging.getLogger(__name__)
 
 TETRIS_URL = "https://t-cantero.github.io/GameBot/"
 
+COMANDOS = {
+    "start": "Muestra todos los comandos disponibles",
+    "tetris": "Permite jugar al juego de tetris",
+    "jugar": "Acceso de manera rápida al juego del tetris",
+}
+
+async def start(update: Update, context:CallbackContext):
+    texto = "📋 Comandos disponibes:\n"
+    for comando,descripcion in COMANDOS.items():
+        texto += f"{comando}: {descripcion}\n"
+    await update.message.reply_text(texto)
+
 async def tetris(update: Update, context: CallbackContext):
     keyboard = [[
         InlineKeyboardButton(
@@ -60,7 +72,7 @@ async def jugar(update: Update, context: CallbackContext):
     await tetris(update, context)
 def main():
     app = Application.builder().token(TOKEN).build()
-
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("tetris", tetris))
     app.add_handler(CommandHandler("jugar", jugar))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, resultado_tetris))

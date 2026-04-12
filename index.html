@@ -10,94 +10,74 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
-    :root {
-      --bg: #0a0a0f;
-      --panel: #12121a;
-      --border: #2a2a3a;
-      --cyan: #00f5ff;
-      --yellow: #ffe600;
-      --purple: #bf00ff;
-      --green: #00ff6a;
-      --red: #ff2d55;
-      --orange: #ff6a00;
-      --blue: #1a6aff;
-      --ghost: rgba(255,255,255,0.07);
-      --text: #e0e0ff;
-      --dim: #555577;
-    }
-
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+      touch-action: manipulation;
     }
 
     body {
-      background: var(--bg);
-      font-family: 'Press Start 2P', monospace;
-      color: var(--text);
-      height: 100dvh;
+      background: #0d0d1a;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
+      min-height: 100dvh;
+      font-family: 'Press Start 2P', monospace;
+      color: #eee;
       overflow: hidden;
-      user-select: none;
+      padding-top: 8px;
     }
 
-    /* SCANLINES */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0,0,0,0.15) 2px,
-        rgba(0,0,0,0.15) 4px
-      );
-      pointer-events: none;
-      z-index: 999;
-    }
-
-    #wrapper {
+    #topbar {
       display: flex;
-      gap: 12px;
+      gap: 16px;
+      margin-bottom: 6px;
+      font-size: 8px;
+    }
+
+    .stat { text-align: center; }
+    .stat-label { color: #555; font-size: 6px; margin-bottom: 2px; }
+    .stat-val { color: #ffe600; text-shadow: 0 0 6px #ffe600; }
+
+    #game-wrap {
+      display: flex;
+      gap: 8px;
       align-items: flex-start;
     }
 
-    #game-canvas {
-      border: 3px solid var(--cyan);
-      box-shadow: 0 0 20px var(--cyan);
+    canvas#board {
+      border: 2px solid #00f5ff;
+      box-shadow: 0 0 12px #00f5ff55;
+      display: block;
       image-rendering: pixelated;
     }
 
-    #side-panel {
+    #side {
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      width: 90px;
+      gap: 8px;
+      font-size: 7px;
     }
 
-    .panel-box {
-      background: var(--panel);
-      border: 2px solid var(--border);
-      padding: 8px 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
+    .side-box {
+      border: 1px solid #222;
+      padding: 6px;
+      text-align: center;
+      background: #111;
     }
 
-    .panel-label {
+    .side-box .lbl {
+      color: #444;
       font-size: 5px;
-      color: var(--dim);
+      margin-bottom: 4px;
     }
 
-    .panel-value {
-      font-size: 8px;
-      color: var(--yellow);
+    #next-canvas {
+      image-rendering: pixelated;
+      display: block;
+      margin: 0 auto;
     }
 
     #controls {
@@ -105,38 +85,72 @@
       grid-template-columns: repeat(3, 56px);
       grid-template-rows: repeat(2, 52px);
       gap: 6px;
-      margin-top: 12px;
+      margin-top: 8px;
     }
 
-    .btn {
-      background: var(--panel);
-      border: 2px solid var(--border);
-      color: var(--text);
-      font-family: 'Press Start 2P';
-      font-size: 16px;
+    .cbtn {
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #ccc;
+      font-size: 18px;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    .cbtn:active {
+      background: #1a2a2a;
+      border-color: #00f5ff;
     }
 
     #overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.85);
+      background: rgba(0,0,0,0.88);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 18px;
-      z-index: 100;
+      gap: 20px;
+      z-index: 50;
+      text-align: center;
+      padding: 20px;
     }
 
-    #start-btn {
-      background: var(--cyan);
+    #overlay h1 {
+      font-size: 28px;
+      color: #00f5ff;
+      text-shadow: 0 0 16px #00f5ff;
+      animation: blink 1s step-end infinite;
+    }
+
+    .ov-result { font-size: 9px; color: #ffe600; line-height: 2.2; }
+    .ov-sub    { font-size: 7px; color: #555; line-height: 2; }
+
+    .play-btn {
+      background: #00f5ff;
       color: #000;
+      border: none;
       font-family: 'Press Start 2P';
-      padding: 14px 24px;
+      font-size: 9px;
+      padding: 14px 28px;
       cursor: pointer;
+      box-shadow: 0 0 16px #00f5ff;
+    }
+
+    .retry-btn {
+      background: #1a1a1a;
+      color: #888;
+      border: 1px solid #333;
+      font-size: 8px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
     }
   </style>
 </head>
@@ -146,36 +160,40 @@
   <!-- OVERLAY -->
   <div id="overlay">
     <h1>TETRIS</h1>
-    <div class="sub">
-      ← → MOVER<br>
-      ↑ ROTAR<br>
-      ↓ BAJAR
+    <div class="ov-sub">
+      ARRIBA: rotar &nbsp; ABAJO: bajar<br>
+      IZQ / DER: mover
     </div>
-    <button id="start-btn" onclick="startGame()">► JUGAR</button>
+    <button class="play-btn" id="btnPlay">JUGAR</button>
   </div>
 
-  <!-- JUEGO -->
-  <div id="wrapper">
-    <canvas id="game-canvas"></canvas>
+  <!-- HUD -->
+  <div id="topbar">
+    <div class="stat">
+      <div class="stat-label">SCORE</div>
+      <div class="stat-val" id="dScore">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">NIVEL</div>
+      <div class="stat-val" id="dLevel">1</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">LÍNEAS</div>
+      <div class="stat-val" id="dLines">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">TIEMPO</div>
+      <div class="stat-val" id="dTime">00:00</div>
+    </div>
+  </div>
 
-    <div id="side-panel">
-      <div class="panel-box">
-        <div class="panel-label">SCORE</div>
-        <div class="panel-value" id="score-display">0</div>
-      </div>
+  <!-- GAME -->
+  <div id="game-wrap">
+    <canvas id="board"></canvas>
 
-      <div class="panel-box">
-        <div class="panel-label">NIVEL</div>
-        <div class="panel-value" id="level-display">1</div>
-      </div>
-
-      <div class="panel-box">
-        <div class="panel-label">TIEMPO</div>
-        <div id="timer-display">00:00</div>
-      </div>
-
-      <div class="panel-box">
-        <div class="panel-label">NEXT</div>
+    <div id="side">
+      <div class="side-box">
+        <div class="lbl">NEXT</div>
         <canvas id="next-canvas"></canvas>
       </div>
     </div>
@@ -183,49 +201,22 @@
 
   <!-- CONTROLES -->
   <div id="controls">
-    <button class="btn" onclick="e_rotate(event)">↑</button>
-    <button class="btn" onclick="e_left(event)">←</button>
-    <button class="btn" onclick="e_down(event)">↓</button>
-    <button class="btn" onclick="e_right(event)">→</button>
+    <div></div>
+    <button class="cbtn" id="btn-up">↑</button>
+    <div></div>
+    <button class="cbtn" id="btn-left">←</button>
+    <button class="cbtn" id="btn-down">↓</button>
+    <button class="cbtn" id="btn-right">→</button>
   </div>
 
   <script>
-    const canvas = document.getElementById('game-canvas');
-    const ctx = canvas.getContext('2d');
-
-    const COLS = 10;
-    const ROWS = 20;
-
-    let state = null;
-
-    function newState() {
-      return {
-        board: Array.from({ length: ROWS }, () => Array(COLS).fill(null)),
-        score: 0,
-        level: 1
-      };
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
     }
 
-    function startGame() {
-      document.getElementById('overlay').style.display = 'none';
-      state = newState();
-    }
-
-    function e_left() {
-      console.log("LEFT");
-    }
-
-    function e_right() {
-      console.log("RIGHT");
-    }
-
-    function e_down() {
-      console.log("DOWN");
-    }
-
-    function e_rotate() {
-      console.log("ROTATE");
-    }
+    // Aquí mantienes TODO tu JS igual (ya está bastante limpio)
   </script>
 
 </body>
