@@ -38,8 +38,17 @@
     }
 
     .stat { text-align: center; }
-    .stat-label { color: #555; font-size: 6px; margin-bottom: 2px; }
-    .stat-val { color: #ffe600; text-shadow: 0 0 6px #ffe600; }
+
+    .stat-label {
+      color: #555;
+      font-size: 6px;
+      margin-bottom: 2px;
+    }
+
+    .stat-val {
+      color: #ffe600;
+      text-shadow: 0 0 6px #ffe600;
+    }
 
     #game-wrap {
       display: flex;
@@ -98,6 +107,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .cbtn:active {
@@ -126,24 +136,39 @@
       animation: blink 1s step-end infinite;
     }
 
-    .ov-result { font-size: 9px; color: #ffe600; line-height: 2.2; }
-    .ov-sub    { font-size: 7px; color: #555; line-height: 2; }
+    .ov-result {
+      font-size: 9px;
+      color: #ffe600;
+      line-height: 2.2;
+    }
+
+    .ov-sub {
+      font-size: 7px;
+      color: #555;
+      line-height: 2;
+    }
 
     .play-btn {
       background: #00f5ff;
       color: #000;
       border: none;
-      font-family: 'Press Start 2P';
+      font-family: 'Press Start 2P', monospace;
       font-size: 9px;
       padding: 14px 28px;
       cursor: pointer;
+      letter-spacing: 2px;
       box-shadow: 0 0 16px #00f5ff;
+    }
+
+    .play-btn:active {
+      transform: scale(0.96);
     }
 
     .retry-btn {
       background: #1a1a1a;
       color: #888;
       border: 1px solid #333;
+      font-family: 'Press Start 2P', monospace;
       font-size: 8px;
       padding: 10px 20px;
       cursor: pointer;
@@ -157,7 +182,6 @@
 
 <body>
 
-  <!-- OVERLAY -->
   <div id="overlay">
     <h1>TETRIS</h1>
     <div class="ov-sub">
@@ -167,27 +191,28 @@
     <button class="play-btn" id="btnPlay">JUGAR</button>
   </div>
 
-  <!-- HUD -->
   <div id="topbar">
     <div class="stat">
       <div class="stat-label">SCORE</div>
       <div class="stat-val" id="dScore">0</div>
     </div>
+
     <div class="stat">
       <div class="stat-label">NIVEL</div>
       <div class="stat-val" id="dLevel">1</div>
     </div>
+
     <div class="stat">
       <div class="stat-label">LÍNEAS</div>
       <div class="stat-val" id="dLines">0</div>
     </div>
+
     <div class="stat">
       <div class="stat-label">TIEMPO</div>
       <div class="stat-val" id="dTime">00:00</div>
     </div>
   </div>
 
-  <!-- GAME -->
   <div id="game-wrap">
     <canvas id="board"></canvas>
 
@@ -199,11 +224,11 @@
     </div>
   </div>
 
-  <!-- CONTROLES -->
   <div id="controls">
     <div></div>
     <button class="cbtn" id="btn-up">↑</button>
     <div></div>
+
     <button class="cbtn" id="btn-left">←</button>
     <button class="cbtn" id="btn-down">↓</button>
     <button class="cbtn" id="btn-right">→</button>
@@ -211,12 +236,116 @@
 
   <script>
     const tg = window.Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand();
+    if (tg) { tg.ready(); tg.expand(); }
+
+    const boardCanvas = document.getElementById('board');
+    const bCtx = boardCanvas.getContext('2d');
+    const nextCanvas = document.getElementById('next-canvas');
+    const nCtx = nextCanvas.getContext('2d');
+
+    const COLS = 10, ROWS = 20;
+    let B = 24;
+
+    function calcSize() {
+      const availH = window.innerHeight - 200;
+      const availW = (window.innerWidth - 80) * 0.72;
+
+      B = Math.max(16, Math.floor(Math.min(availH / ROWS, availW / COLS)));
+
+      boardCanvas.width = COLS * B;
+      boardCanvas.height = ROWS * B;
+
+      const nb = Math.max(12, Math.floor(B * 0.72));
+      nextCanvas.width = 4 * nb;
+      nextCanvas.height = 4 * nb;
+      nextCanvas._nb = nb;
     }
 
-    // Aquí mantienes TODO tu JS igual (ya está bastante limpio)
+    calcSize();
+    window.addEventListener('resize', () => {
+      calcSize();
+      if (G) renderAll();
+    });
+
+    const DEFS = [
+      { cells: [[0,0],[1,0],[2,0],[3,0]], color:'#00f5ff' },
+      { cells: [[0,0],[1,0],[0,1],[1,1]], color:'#ffe600' },
+      { cells: [[1,0],[0,1],[1,1],[2,1]], color:'#bf00ff' },
+      { cells: [[2,0],[0,1],[1,1],[2,1]], color:'#ff6a00' },
+      { cells: [[0,0],[0,1],[1,1],[2,1]], color:'#1a6aff' },
+      { cells: [[1,0],[2,0],[0,1],[1,1]], color:'#00ff6a' },
+      { cells: [[0,0],[1,0],[1,1],[2,1]], color:'#ff2d55' },
+    ];
+
+    function randPiece() {
+      const d = DEFS[Math.floor(Math.random() * DEFS.length)];
+      return {
+        cells: d.cells.map(c => [...c]),
+        color: d.color,
+        ox: 3,
+        oy: 0
+      };
+    }
+
+    function rotateCells(cells) {
+      const minX = Math.min(...cells.map(c => c[0]));
+      const minY = Math.min(...cells.map(c => c[1]));
+      const maxX = Math.max(...cells.map(c => c[0]));
+      const maxY = Math.max(...cells.map(c => c[1]));
+
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+
+      return cells.map(([x, y]) => [
+        Math.round(cy - y + cx),
+        Math.round(x - cx + cy)
+      ]);
+    }
+
+    let G = null;
+
+    function newGame() {
+      return {
+        board: Array.from({ length: ROWS }, () => Array(COLS).fill(null)),
+        cur: randPiece(),
+        next: randPiece(),
+        score: 0,
+        level: 1,
+        lines: 0,
+        running: true,
+        t0: Date.now(),
+        elapsed: 0,
+      };
+    }
+
+    function valid(cells, ox, oy, board) {
+      for (const [x, y] of cells) {
+        const nx = ox + x, ny = oy + y;
+        if (nx < 0 || nx >= COLS || ny >= ROWS) return false;
+        if (ny >= 0 && board[ny][nx] !== null) return false;
+      }
+      return true;
+    }
+
+    function drop() {
+      if (!G?.running) return;
+
+      if (valid(G.cur.cells, G.cur.ox, G.cur.oy + 1, G.board)) {
+        G.cur.oy++;
+      } else {
+        lock();
+      }
+
+      renderAll();
+    }
+
+    function startGame() {
+      document.getElementById('overlay').style.display = 'none';
+      G = newGame();
+      renderAll();
+    }
+
+    document.getElementById('btnPlay').addEventListener('click', startGame);
   </script>
 
 </body>
