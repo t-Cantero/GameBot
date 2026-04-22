@@ -380,7 +380,11 @@ async def pago_exitoso(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]])
     )
 
-
+# ════════════════════════════════════════════════════════════════════════════
+#  DEBUG
+# ════════════════════════════════════════════════════════════════════════════
+async def debug(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"UPDATE COMPLETO: {update.to_dict()}")
 # ════════════════════════════════════════════════════════════════════════════
 #  MAIN
 # ════════════════════════════════════════════════════════════════════════════
@@ -400,8 +404,10 @@ def main():
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, pago_exitoso))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, resultado_tetris))
 
+    app.add_handler(MessageHandler(filters.ALL, debug), group=1)
+
     logger.info("Bot iniciado con sistema de vidas, regeneración y Stars ⭐")
-    app.run_polling()
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
