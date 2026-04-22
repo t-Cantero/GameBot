@@ -618,8 +618,14 @@ function endGame() {
 }
 
 function sendData() {
+    console.log("tg:", tg);
+    console.log("tg.sendData:", tg?.sendData);
+    console.log("datos:", JSON.stringify(window.finalData));
+
     if (tg?.sendData) {
         tg.sendData(JSON.stringify(window.finalData));
+    } else {
+        alert("ERROR: tg.sendData no disponible");
     }
 }
 </script>
