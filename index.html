@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>TETRIS</title>
+<title>TETRIS GAMEBOT</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -17,7 +17,6 @@ body {
   align-items: center;
   overflow: hidden;
   height: 100dvh;
-  /* Evita scroll accidental en móvil */
   touch-action: none;
 }
 
@@ -46,11 +45,10 @@ body {
   border: 2px solid #00f5ff;
   box-shadow: 0 0 10px #00f5ff44;
   display: block;
-  /* touch-action canvas propio para no bloquear scroll del body */
   touch-action: none;
 }
 
-/* ── PANEL LATERAL (NEXT) ── */
+/* ── PANEL LATERAL ── */
 #side {
   display: flex;
   flex-direction: column;
@@ -65,7 +63,7 @@ body {
   display: block;
 }
 
-/* ── CONTROLES TÁCTILES ── */
+/* ── CONTROLES ── */
 #controls {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -86,7 +84,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* evita el flash azul en Android */
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
@@ -96,7 +93,7 @@ body {
 #overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.92);
+  background: rgba(0,0,0,0.95);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -111,44 +108,39 @@ body {
   text-shadow: 0 0 12px #00f5ff;
   letter-spacing: 4px;
 }
-#overlay p { font-size: 11px; color: #555; line-height: 1.8; }
-#overlay .result { font-size: 12px; color: #ffe600; line-height: 2; }
+#overlay p { font-size: 11px; color: #777; line-height: 1.8; }
+#overlay .result { font-size: 14px; color: #ffe600; margin: 10px 0; }
 
 button {
-  padding: 10px 22px;
+  padding: 12px 24px;
   font-family: monospace;
   font-size: 12px;
   cursor: pointer;
   background: #00f5ff;
   color: #000;
   border: none;
-  letter-spacing: 1px;
+  font-weight: bold;
 }
 button.secondary {
   background: #1a1a1a;
-  color: #777;
-  border: 1px solid #333;
+  color: #ff2d55;
+  border: 1px solid #ff2d55;
 }
 </style>
 </head>
 <body>
 
-<!-- OVERLAY inicial y game over -->
 <div id="overlay">
   <h1>TETRIS</h1>
-  <p>TAP: rotar &nbsp;|&nbsp; SWIPE: mover/bajar<br>O usa los botones de abajo</p>
-  <button onclick="startGame()">JUGAR</button>
+  <p>Cargando datos del bot...</p>
 </div>
 
-<!-- HUD -->
 <div id="hud">
   <div>SCORE: <span id="score">0</span></div>
-  <div>LINES: <span id="lines">0</span></div>
   <div>LEVEL: <span id="level">1</span></div>
   <div>TIME:  <span id="time">00:00</span></div>
 </div>
 
-<!-- Tablero + panel next -->
 <div id="game-area">
   <canvas id="board"></canvas>
   <div id="side">
@@ -157,125 +149,92 @@ button.secondary {
   </div>
 </div>
 
-<!-- Controles táctiles -->
 <div id="controls">
-  <!-- fila 1: solo botón rotar centrado -->
   <div></div>
   <button class="btn" id="btn-up">↑</button>
   <div></div>
-  <!-- fila 2: izq / abajo / der -->
   <button class="btn" id="btn-left">←</button>
   <button class="btn" id="btn-down">↓</button>
   <button class="btn" id="btn-right">→</button>
 </div>
 
 <script>
-/* ============================================================
-   TETRIS — versión corregida
-   Mejoras sobre el original:
-   - 7 piezas completas con color individual
-   - Rotación con wall-kick básico
-   - Pieza fantasma (ghost)
-   - Botones táctiles + swipe/tap sobre canvas
-   - Tamaño adaptable sin borrosidad (sin DPR en coordenadas)
-   - Panel NEXT
-============================================================ */
-
+/** * INTEGRACIÓN TELEGRAM Y MURO DE VIDAS
+ */
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-// ── Canvas principal ──
-const canvas = document.getElementById("board");
-const ctx    = canvas.getContext("2d");
+const urlParams = new URLSearchParams(window.location.search);
+const vidasDisponibles = parseInt(urlParams.get('vidas') || "0");
 
-// ── Canvas NEXT ──
+// Inicializar pantalla según vidas
+window.addEventListener('load', () => {
+    const overlay = document.getElementById("overlay");
+    if (vidasDisponibles <= 0) {
+        overlay.innerHTML = `
+            <h1 style="color: #ff2d55; text-shadow: 0 0 15px #ff2d55;">SIN VIDAS</h1>
+            <p>No te quedan vidas disponibles.<br>Espera a que se recarguen en el bot.</p>
+            <button class="secondary" onclick="tg.close()">CERRAR JUEGO</button>
+        `;
+    } else {
+        overlay.innerHTML = `
+            <h1>TETRIS</h1>
+            <p>TAP: rotar | SWIPE: mover<br>O usa los botones de abajo</p>
+            <button onclick="startGame()">EMPEZAR JUEGO</button>
+        `;
+    }
+});
+
+/**
+ * LÓGICA DEL JUEGO TETRIS
+ */
+const canvas = document.getElementById("board");
+const ctx = canvas.getContext("2d");
 const nCanvas = document.getElementById("next-canvas");
-const nCtx    = nCanvas.getContext("2d");
+const nCtx = nCanvas.getContext("2d");
 
 const COLS = 10;
 const ROWS = 20;
-let   SIZE = 28;   // tamaño lógico de cada celda (px)
-let   NB   = 20;   // tamaño celda en canvas NEXT
+let SIZE, NB;
 
-// ── 7 piezas clásicas con color ──
-// Cada pieza: array de [col, fila] relativas al origen
 const PIECES = [
-  { cells: [[0,0],[1,0],[2,0],[3,0]], color: "#00f5ff" }, // I
-  { cells: [[0,0],[1,0],[0,1],[1,1]], color: "#ffe600" }, // O
-  { cells: [[1,0],[0,1],[1,1],[2,1]], color: "#bf00ff" }, // T
-  { cells: [[0,0],[0,1],[1,1],[2,1]], color: "#1a6aff" }, // J
-  { cells: [[2,0],[0,1],[1,1],[2,1]], color: "#ff6a00" }, // L
-  { cells: [[1,0],[2,0],[0,1],[1,1]], color: "#00ff6a" }, // S
-  { cells: [[0,0],[1,0],[1,1],[2,1]], color: "#ff2d55" }, // Z
+  { cells: [[0,0],[1,0],[2,0],[3,0]], color: "#00f5ff" },
+  { cells: [[0,0],[1,0],[0,1],[1,1]], color: "#ffe600" },
+  { cells: [[1,0],[0,1],[1,1],[2,1]], color: "#bf00ff" },
+  { cells: [[0,0],[0,1],[1,1],[2,1]], color: "#1a6aff" },
+  { cells: [[2,0],[0,1],[1,1],[2,1]], color: "#ff6a00" },
+  { cells: [[1,0],[2,0],[0,1],[1,1]], color: "#00ff6a" },
+  { cells: [[0,0],[1,0],[1,1],[2,1]], color: "#ff2d55" },
 ];
 
-// ── Estado global ──
-let G            = null;
-let dropCounter  = 0;
-let dropInterval = 600;
-let lastTime     = 0;
-let rafID        = null;
+let G = null, dropCounter = 0, dropInterval = 600, lastTime = 0, rafID = null;
 
-/* ======================================================
-   RESPONSIVE — calcula SIZE sin DPR para no necesitar
-   escalar las coordenadas de dibujo
-====================================================== */
 function resize() {
-  // Espacio disponible: ancho - margen - panel NEXT (~60px) - gaps
-  const availW = Math.min(window.innerWidth  - 80,  300);
-  const availH = Math.min(window.innerHeight - 200, 600);
-
+  const availW = Math.min(window.innerWidth - 80, 300);
+  const availH = Math.min(window.innerHeight - 220, 600);
   SIZE = Math.floor(Math.min(availW / COLS, availH / ROWS));
-  SIZE = Math.max(SIZE, 16);
-
   NB = Math.max(14, Math.floor(SIZE * 0.7));
-
-  // Canvas principal — sin DPR (coordenadas 1:1)
-  canvas.width  = SIZE * COLS;
+  canvas.width = SIZE * COLS;
   canvas.height = SIZE * ROWS;
-  canvas.style.width  = canvas.width  + "px";
-  canvas.style.height = canvas.height + "px";
-
-  // Canvas NEXT — 4×4 celdas
-  nCanvas.width  = NB * 4;
+  nCanvas.width = NB * 4;
   nCanvas.height = NB * 4;
-  nCanvas.style.width  = nCanvas.width  + "px";
-  nCanvas.style.height = nCanvas.height + "px";
-
   if (G) drawAll();
 }
-
 window.addEventListener("resize", resize);
 resize();
 
-/* ======================================================
-   HELPERS DE PIEZA
-====================================================== */
 function randPiece() {
   const def = PIECES[Math.floor(Math.random() * PIECES.length)];
-  return {
-    cells: def.cells.map(c => [...c]), // copia profunda
-    color: def.color,
-    ox: 3,  // offset X en el tablero
-    oy: 0   // offset Y en el tablero
-  };
+  return { cells: def.cells.map(c => [...c]), color: def.color, ox: 3, oy: 0 };
 }
 
-// Rotación 90° CW sobre coordenadas [x,y] relativas
 function rotateCells(cells) {
-  // Normalizar a origen (0,0) primero
-  const minX = Math.min(...cells.map(c => c[0]));
-  const minY = Math.min(...cells.map(c => c[1]));
+  const minX = Math.min(...cells.map(c => c[0])), minY = Math.min(...cells.map(c => c[1]));
   const norm = cells.map(([x,y]) => [x - minX, y - minY]);
-
-  // Rotar: (x,y) → (maxY - y, x)
   const maxY = Math.max(...norm.map(c => c[1]));
   return norm.map(([x,y]) => [maxY - y, x]);
 }
 
-/* ======================================================
-   VALIDACIÓN DE POSICIÓN
-====================================================== */
 function isValid(cells, ox, oy) {
   for (const [x, y] of cells) {
     const nx = ox + x, ny = oy + y;
@@ -285,52 +244,32 @@ function isValid(cells, ox, oy) {
   return true;
 }
 
-/* ======================================================
-   ESTADO DEL JUEGO
-====================================================== */
-function newGame() {
-  return {
-    board:   Array.from({ length: ROWS }, () => Array(COLS).fill(null)),
-    cur:     randPiece(),
-    next:    randPiece(),
-    score:   0,
-    lines:   0,
-    level:   1,
-    running: true,
-    start:   Date.now()
+function startGame() {
+  if (vidasDisponibles <= 0) return;
+  document.getElementById("overlay").style.display = "none";
+  G = {
+    board: Array.from({ length: ROWS }, () => Array(COLS).fill(null)),
+    cur: randPiece(), next: randPiece(),
+    score: 0, lines: 0, level: 1, running: true, start: Date.now()
   };
+  dropCounter = 0; lastTime = 0; dropInterval = 600;
+  requestAnimationFrame(loop);
 }
 
-/* ======================================================
-   LÓGICA
-====================================================== */
 function drop() {
   if (!G?.running) return;
-
-  if (isValid(G.cur.cells, G.cur.ox, G.cur.oy + 1)) {
-    G.cur.oy++;
-  } else {
-    lockPiece();
-  }
+  if (isValid(G.cur.cells, G.cur.ox, G.cur.oy + 1)) G.cur.oy++;
+  else lockPiece();
 }
 
 function lockPiece() {
-  // Fijar pieza en tablero
   for (const [x, y] of G.cur.cells) {
     if (G.cur.oy + y < 0) { endGame(); return; }
     G.board[G.cur.oy + y][G.cur.ox + x] = G.cur.color;
   }
-
   clearLines();
-
-  // Siguiente pieza
-  G.cur  = G.next;
-  G.next = randPiece();
-
-  // Game over si no cabe
-  if (!isValid(G.cur.cells, G.cur.ox, G.cur.oy)) {
-    endGame();
-  }
+  G.cur = G.next; G.next = randPiece();
+  if (!isValid(G.cur.cells, G.cur.ox, G.cur.oy)) endGame();
 }
 
 function clearLines() {
@@ -339,291 +278,85 @@ function clearLines() {
     if (G.board[r].every(v => v !== null)) {
       G.board.splice(r, 1);
       G.board.unshift(Array(COLS).fill(null));
-      cleared++;
-      r++; // revisar misma fila tras el splice
+      cleared++; r++;
     }
   }
-  if (!cleared) return;
-
-  const pts = [0, 100, 300, 500, 800];
-  G.score += (pts[Math.min(cleared, 4)]) * G.level;
-  G.lines += cleared;
-  G.level  = Math.floor(G.lines / 10) + 1;
-  dropInterval = Math.max(80, 600 - (G.level - 1) * 55);
-}
-
-function moveX(dir) {
-  if (!G?.running) return;
-  if (isValid(G.cur.cells, G.cur.ox + dir, G.cur.oy)) G.cur.ox += dir;
-}
-
-function rotate() {
-  if (!G?.running) return;
-  const rotated = rotateCells(G.cur.cells);
-
-  // Wall-kick: intenta 0, -1, +1, -2, +2
-  const kicks = [0, -1, 1, -2, 2];
-  for (const k of kicks) {
-    if (isValid(rotated, G.cur.ox + k, G.cur.oy)) {
-      G.cur.cells = rotated;
-      G.cur.ox   += k;
-      return;
-    }
+  if (cleared > 0) {
+    const pts = [0, 100, 300, 500, 800];
+    G.score += pts[Math.min(cleared, 4)] * G.level;
+    G.lines += cleared;
+    G.level = Math.floor(G.lines / 10) + 1;
+    dropInterval = Math.max(80, 600 - (G.level - 1) * 50);
   }
-  // Si ninguno encaja, no rota (pieza O, esquinas)
 }
 
-// Calcula la Y más baja que puede ocupar la pieza actual (fantasma)
-function ghostY() {
-  let gy = G.cur.oy;
-  while (isValid(G.cur.cells, G.cur.ox, gy + 1)) gy++;
-  return gy;
+function drawBlock(ctx, color, x, y, s) {
+  ctx.fillStyle = "#000"; ctx.fillRect(x, y, s, s);
+  ctx.fillStyle = color; ctx.fillRect(x+1, y+1, s-2, s-2);
 }
 
-/* ======================================================
-   DIBUJO
-====================================================== */
-function drawBlock(c, color, px, py, size) {
-  // Fondo negro de la celda
-  c.fillStyle = "#000";
-  c.fillRect(px, py, size, size);
-  // Relleno color
-  c.fillStyle = color;
-  c.fillRect(px + 1, py + 1, size - 2, size - 2);
-  // Brillo superior
-  c.fillStyle = "rgba(255,255,255,0.25)";
-  c.fillRect(px + 1, py + 1, size - 2, 3);
-  c.fillRect(px + 1, py + 1, 3, size - 2);
-  // Sombra inferior
-  c.fillStyle = "rgba(0,0,0,0.3)";
-  c.fillRect(px + 1, py + size - 3, size - 2, 2);
-}
-
-function drawBoard() {
-  // Fondo
-  ctx.fillStyle = "#050510";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Grid sutil
-  ctx.strokeStyle = "rgba(255,255,255,0.04)";
-  ctx.lineWidth = 0.5;
-  for (let x = 0; x <= COLS; x++) {
-    ctx.beginPath(); ctx.moveTo(x * SIZE, 0); ctx.lineTo(x * SIZE, canvas.height); ctx.stroke();
-  }
-  for (let y = 0; y <= ROWS; y++) {
-    ctx.beginPath(); ctx.moveTo(0, y * SIZE); ctx.lineTo(canvas.width, y * SIZE); ctx.stroke();
-  }
-
-  // Celdas fijas
+function drawAll() {
+  ctx.fillStyle = "#050510"; ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++)
       if (G.board[r][c]) drawBlock(ctx, G.board[r][c], c * SIZE, r * SIZE, SIZE);
 
-  if (!G.running) return;
-
-  // Pieza fantasma
-  const gy = ghostY();
-  ctx.globalAlpha = 0.22;
-  for (const [x, y] of G.cur.cells) {
-    ctx.strokeStyle = G.cur.color;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(
-      (G.cur.ox + x) * SIZE + 1,
-      (gy       + y) * SIZE + 1,
-      SIZE - 2, SIZE - 2
-    );
+  if (G.running) {
+    for (const [x, y] of G.cur.cells)
+      drawBlock(ctx, G.cur.color, (G.cur.ox + x) * SIZE, (G.cur.oy + y) * SIZE, SIZE);
   }
-  ctx.globalAlpha = 1;
 
-  // Pieza actual
-  for (const [x, y] of G.cur.cells)
-    drawBlock(ctx, G.cur.color,
-      (G.cur.ox + x) * SIZE,
-      (G.cur.oy + y) * SIZE,
-      SIZE
-    );
+  nCtx.fillStyle = "#050510"; nCtx.fillRect(0, 0, nCanvas.width, nCanvas.height);
+  for (const [x, y] of G.next.cells) drawBlock(nCtx, G.next.color, (x+1)*NB, (y+1)*NB, NB);
 }
 
-function drawNext() {
-  nCtx.fillStyle = "#050510";
-  nCtx.fillRect(0, 0, nCanvas.width, nCanvas.height);
-
-  const cells = G.next.cells;
-  const minX  = Math.min(...cells.map(c => c[0]));
-  const minY  = Math.min(...cells.map(c => c[1]));
-  const maxX  = Math.max(...cells.map(c => c[0]));
-  const maxY  = Math.max(...cells.map(c => c[1]));
-  const offX  = Math.floor((4 - (maxX - minX + 1)) / 2) - minX;
-  const offY  = Math.floor((4 - (maxY - minY + 1)) / 2) - minY;
-
-  for (const [x, y] of cells)
-    drawBlock(nCtx, G.next.color, (offX + x) * NB, (offY + y) * NB, NB);
-}
-
-function drawAll() {
-  drawBoard();
-  drawNext();
-}
-
-function updateHUD() {
-  document.getElementById("score").textContent = G.score;
-  document.getElementById("lines").textContent = G.lines;
-  document.getElementById("level").textContent = G.level;
-
-  const t = Math.floor((Date.now() - G.start) / 1000);
-  document.getElementById("time").textContent =
-    String(Math.floor(t / 60)).padStart(2, "0") + ":" +
-    String(t % 60).padStart(2, "0");
-}
-
-/* ======================================================
-   LOOP PRINCIPAL
-====================================================== */
 function loop(time = 0) {
   if (!G?.running) return;
-
-  const delta = time - lastTime;
-  lastTime = time;
-
+  const delta = time - lastTime; lastTime = time;
   dropCounter += delta;
-  if (dropCounter >= dropInterval) {
-    drop();
-    dropCounter = 0;
-  }
-
+  if (dropCounter >= dropInterval) { drop(); dropCounter = 0; }
   drawAll();
-  updateHUD();
-
+  document.getElementById("score").textContent = G.score;
+  document.getElementById("level").textContent = G.level;
+  const t = Math.floor((Date.now() - G.start) / 1000);
+  document.getElementById("time").textContent = String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0");
   rafID = requestAnimationFrame(loop);
 }
 
-/* ======================================================
-   TECLADO (PC)
-====================================================== */
+// Controles táctiles y teclado
 document.addEventListener("keydown", e => {
   if (!G?.running) return;
-  switch (e.key) {
-    case "ArrowLeft":  moveX(-1);  break;
-    case "ArrowRight": moveX(1);   break;
-    case "ArrowDown":  drop();     break;
-    case "ArrowUp":    rotate();   break;
-    case " ":
-      // Hard drop
-      while (isValid(G.cur.cells, G.cur.ox, G.cur.oy + 1)) G.cur.oy++;
-      drop();
-      break;
-  }
+  if (e.key === "ArrowLeft") moveX(-1);
+  if (e.key === "ArrowRight") moveX(1);
+  if (e.key === "ArrowDown") drop();
+  if (e.key === "ArrowUp") { const r = rotateCells(G.cur.cells); if (isValid(r, G.cur.ox, G.cur.oy)) G.cur.cells = r; }
 });
 
-/* ======================================================
-   BOTONES TÁCTILES
-   — touchstart para respuesta inmediata sin esperar 300ms
-====================================================== */
-function addTouchBtn(id, action) {
-  const el = document.getElementById(id);
-  // touchstart = reacción instantánea
-  el.addEventListener("touchstart", e => {
-    e.preventDefault(); // evita el delay de 300ms y el scroll
-    action();
-  }, { passive: false });
-  // mousedown para PC también
-  el.addEventListener("mousedown", e => {
-    e.preventDefault();
-    action();
-  });
-}
+const addBtn = (id, fn) => document.getElementById(id).addEventListener("touchstart", e => { e.preventDefault(); fn(); });
+addBtn("btn-left", () => moveX(-1));
+addBtn("btn-right", () => moveX(1));
+addBtn("btn-up", () => { const r = rotateCells(G.cur.cells); if (isValid(r, G.cur.ox, G.cur.oy)) G.cur.cells = r; });
+addBtn("btn-down", () => drop());
 
-addTouchBtn("btn-left",  () => moveX(-1));
-addTouchBtn("btn-right", () => moveX(1));
-addTouchBtn("btn-up",    () => rotate());
-addTouchBtn("btn-down",  () => {
-  // Bajada rápida: baja hasta el fondo
-  while (isValid(G.cur.cells, G.cur.ox, G.cur.oy + 1)) G.cur.oy++;
-  drop();
-});
-
-let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
-
-canvas.addEventListener("touchstart", e => {
-  const t = e.touches[0];
-  touchStartX    = t.clientX;
-  touchStartY    = t.clientY;
-  touchStartTime = Date.now();
-}, { passive: true });
-
-canvas.addEventListener("touchend", e => {
-  if (!G?.running) return;
-
-  const t    = e.changedTouches[0];
-  const dx   = t.clientX - touchStartX;
-  const dy   = t.clientY - touchStartY;
-  const absX = Math.abs(dx);
-  const absY = Math.abs(dy);
-  const dt   = Date.now() - touchStartTime;
-
-  // Tap → rotar
-  if (dt < 200 && absX < 12 && absY < 12) {
-    rotate();
-    return;
-  }
-
-  // Swipe horizontal → mover
-  if (absX > absY && absX > 25) {
-    moveX(dx > 0 ? 1 : -1);
-    return;
-  }
-
-  // Swipe abajo → bajar una fila
-  if (dy > 30 && absY > absX) {
-    drop();
-  }
-}, { passive: true });
-
-/* ======================================================
-   INICIO / FIN
-====================================================== */
-function startGame() {
-  document.getElementById("overlay").style.display = "none";
-  cancelAnimationFrame(rafID);
-
-  G            = newGame();
-  dropCounter  = 0;
-  dropInterval = 600;
-  lastTime     = 0;
-
-  rafID = requestAnimationFrame(loop);
-}
+function moveX(d) { if (isValid(G.cur.cells, G.cur.ox + d, G.cur.oy)) G.cur.ox += d; }
 
 function endGame() {
-    G.running = false;
-
-    window.finalData = {
-        score: G.score,
-        tiempo: document.getElementById("time").textContent,
-        nivel: G.level,
-        lineas: G.lines
-    };
-
-    document.getElementById("overlay").innerHTML = `
-        <h2>GAME OVER</h2>
-        <div class="result">
-            SCORE &nbsp; ${G.score}<br>
-            TIEMPO &nbsp; ${window.finalData.tiempo}<br>
-            NIVEL &nbsp; ${G.level}<br>
-            LÍNEAS &nbsp; ${G.lines}
-        </div>
-        <button onclick="sendData()">✓ ENVIAR Y SALIR</button>
-    `;
-    document.getElementById("overlay").style.display = "flex";
+  G.running = false;
+  const overlay = document.getElementById("overlay");
+  overlay.innerHTML = `
+    <h2>GAME OVER</h2>
+    <div class="result">SCORE: ${G.score}</div>
+    <button onclick="sendData()">ENVIAR Y SALIR</button>
+  `;
+  overlay.style.display = "flex";
 }
 
 function sendData() {
-    if (tg?.sendData) {
-        tg.sendData(JSON.stringify({
-          ...window.finalData,
-          user_id: tg.initDataUnsafe?.user?.id
-        }));
-    }
+  if (tg?.sendData) {
+    tg.sendData(JSON.stringify({ score: G.score }));
+  } else {
+    tg.close();
+  }
 }
 </script>
 </body>
