@@ -75,7 +75,19 @@ def aplicar_regeneracion(usuario):
     vidas = usuario["vidas"]
     ultima = usuario["ultima_perdida"]
 
-    if not ultima or vidas >= VIDAS_MAX:
+    # REGLA DE ORO: Si ya tiene el máximo (o más), no hay nada que regenerar.
+    if vidas >= VIDAS_MAX:
+        # Si tenía un timestamp guardado, lo limpiamos porque ya está al máximo
+        if ultima is not None:
+            with sqlite3.connect("gamebot.db") as con:
+                con.execute("UPDATE usuarios SET ultima_perdida = NULL WHERE user_id = ?", (usuario["user_id"],))
+        return usuario
+
+    # Si no tiene timestamp pero le faltan vidas, algo falló (ponemos el tiempo actual)
+    if not ultima:
+        ahora = datetime.now(timezone.utc).isoformat()
+        with sqlite3.connect("gamebot.db") as con:
+            con.execute("UPDATE usuarios SET ultima_perdida = ? WHERE user_id = ?", (ahora, usuario["user_id"]))
         return usuario
 
     ahora = datetime.now(timezone.utc)
@@ -83,33 +95,49 @@ def aplicar_regeneracion(usuario):
 
     segundos_transcurridos = (ahora - ultima_dt).total_seconds()
     segundos_por_vida = HORAS_POR_VIDA * 3600
+
     recuperadas = int(segundos_transcurridos // segundos_por_vida)
 
     if recuperadas > 0:
-        nuevas = min(VIDAS_MAX, vidas + recuperadas)
-        if nuevas >= VIDAS_MAX:
+        # Sumamos las recuperadas sin pasarnos del máximo
+        nuevas_vidas = min(VIDAS_MAX, vidas + recuperadas)
+
+        # Si llegamos al máximo, borramos el tiempo.
+        # Si aún faltan, adelantamos el tiempo "gastado" para no perder los minutos sobrantes
+        if nuevas_vidas >= VIDAS_MAX:
             nueva_ultima = None
         else:
             nueva_ultima = (ultima_dt + (recuperadas * segundos_por_vida)).isoformat()
 
         with sqlite3.connect("gamebot.db") as con:
             con.execute("UPDATE usuarios SET vidas=?, ultima_perdida=? WHERE user_id=?",
-                        (nuevas, nueva_ultima, usuario["user_id"]))
+                        (nuevas_vidas, nueva_ultima, usuario["user_id"]))
 
-        usuario["vidas"] = nuevas
+        usuario["vidas"] = nuevas_vidas
         usuario["ultima_perdida"] = nueva_ultima
 
     return usuario
 
 
 def actualizar_vidas_post_partida(user_id, vidas_actuales):
+    # Restamos 1 vida
     nuevas = max(0, vidas_actuales - 1)
-    ahora = datetime.now(timezone.utc).isoformat()
 
     with sqlite3.connect("gamebot.db") as con:
+        # Escenario A: Estaba al máximo justo y ahora le falta una -> Empezamos a contar
         if vidas_actuales == VIDAS_MAX:
+            ahora = datetime.now(timezone.utc).isoformat()
             con.execute("UPDATE usuarios SET vidas=?, ultima_perdida=? WHERE user_id=?",
                         (nuevas, ahora, user_id))
+
+        # Escenario B: Tenía "bonus" (ej. 5 vidas). Ahora tiene 4.
+        # Sigue estando por encima del máximo, así que no activamos cronómetro.
+        elif vidas_actuales > VIDAS_MAX:
+            con.execute("UPDATE usuarios SET vidas=?, ultima_perdida=NULL WHERE user_id=?",
+                        (nuevas, user_id))
+
+        # Escenario C: Ya estaba regenerando (ej. tenía 1 vida y ahora 0)
+        # Solo actualizamos el número, mantenemos el cronómetro que ya corría.
         else:
             con.execute("UPDATE usuarios SET vidas=? WHERE user_id=?", (nuevas, user_id))
 
