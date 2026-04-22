@@ -542,10 +542,6 @@ addTouchBtn("btn-down",  () => {
   drop();
 });
 
-/* ======================================================
-   SWIPE + TAP sobre el canvas (como estaba en el original,
-   pero con umbrales más cómodos para Telegram)
-====================================================== */
 let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
 
 canvas.addEventListener("touchstart", e => {
@@ -599,36 +595,32 @@ function startGame() {
 }
 
 function endGame() {
-  G.running = false;
-  cancelAnimationFrame(rafID);
+    G.running = false;
 
-  const timeStr = document.getElementById("time").textContent;
+    window.finalData = {
+        score: G.score,
+        tiempo: document.getElementById("time").textContent,
+        nivel: G.level,
+        lineas: G.lines
+    };
 
-  window.finalData = {
-    score:  G.score,
-    tiempo: timeStr,
-    nivel:  G.level,
-    lineas: G.lines
-  };
-
-  const ov = document.getElementById("overlay");
-  ov.innerHTML = `
-    <h2>GAME OVER</h2>
-    <div class="result">
-      SCORE &nbsp; ${G.score}<br>
-      TIEMPO &nbsp; ${timeStr}<br>
-      NIVEL &nbsp; ${G.level}<br>
-      LÍNEAS &nbsp; ${G.lines}
-    </div>
-    <button onclick="sendData()">ENVIAR</button>
-    <button class="secondary" onclick="startGame()">REINTENTAR</button>
-  `;
-  ov.style.display = "flex";
+    document.getElementById("overlay").innerHTML = `
+        <h2>GAME OVER</h2>
+        <div class="result">
+            SCORE &nbsp; ${G.score}<br>
+            TIEMPO &nbsp; ${window.finalData.tiempo}<br>
+            NIVEL &nbsp; ${G.level}<br>
+            LÍNEAS &nbsp; ${G.lines}
+        </div>
+        <button onclick="sendData()">✓ ENVIAR Y SALIR</button>
+    `;
+    document.getElementById("overlay").style.display = "flex";
 }
 
 function sendData() {
-  if (tg?.sendData) tg.sendData(JSON.stringify(window.finalData));
-  else alert(JSON.stringify(window.finalData));
+    if (tg?.sendData) {
+        tg.sendData(JSON.stringify(window.finalData));
+    }
 }
 </script>
 </body>
