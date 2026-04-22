@@ -619,7 +619,10 @@ function endGame() {
 
 function sendData() {
     if (tg?.sendData) {
-        tg.sendData(JSON.stringify(window.finalData));
+        tg.sendData(JSON.stringify({
+          ...window.finalData,
+          user_id: tg.initDataUnsafe?.user?.id
+        }));
     }
 }
 </script>
