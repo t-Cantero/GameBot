@@ -179,11 +179,11 @@ def tiempo_proxima_vida(usuario: dict) -> str:
 def teclado_jugar(tiene_vidas: bool):
     if tiene_vidas:
         return InlineKeyboardMarkup([[
-            InlineKeyboardButton("🎮 Jugar Tetris", web_app=WebAppInfo(url=TETRIS_URL))
+            InlineKeyboardButton("🎮 Jugar Tetris", callback_data="jugar_tetris")
         ]])
     else:
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎮 Jugar Tetris", web_app=WebAppInfo(url=TETRIS_URL))],
+            [InlineKeyboardButton("🎮 Jugar Tetris", callback_data="jugar_tetris")],
             [InlineKeyboardButton("⭐ 1 vida  — 10 Stars", callback_data="comprar_vidas_1")],
             [InlineKeyboardButton("⭐ 3 vidas — 25 Stars", callback_data="comprar_vidas_3")],
             [InlineKeyboardButton("⭐ 5 vidas — 40 Stars", callback_data="comprar_vidas_5")],
@@ -230,10 +230,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=teclado_jugar(vidas > 0)
     )
 
+async def verificar_y_jugar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-async def jugar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await start(update, context)
+    user    = query.from_user
+    usuario = get_usuario(user.id, user.username or user.first_name)
+    vidas   = usuario["vidas"]
 
+    if vidas <= 0:
+        tiempo = tiempo_proxima_vida(usuario)
+        await query.message.reply_text(
+            f"💀 *¡Sin vidas!*\n\n"
+            f"⏳ Próxima vida en: *{tiempo}*\n\n"
+            f"Compra más para seguir jugando:",
+            parse_mode="Markdown",
+            reply_markup=teclado_sin_vidas()
+        )
+    else:
+        await query.message.reply_text(
+            f"❤️ Vidas: *{vidas}* — ¡Buena suerte!",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🎮 Abrir Tetris", web_app=WebAppInfo(url=TETRIS_URL))
+            ]])
+        )
 
 async def vidas_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user    = update.effective_user
@@ -395,11 +416,10 @@ def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("jugar", jugar))
     app.add_handler(CommandHandler("vidas", vidas_cmd))
 
     app.add_handler(CallbackQueryHandler(boton_comprar, pattern="^comprar_"))
-
+    app.add_handler(CallbackQueryHandler(verificar_y_jugar, pattern="^jugar_tetris$"))
     app.add_handler(PreCheckoutQueryHandler(precheckout))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, pago_exitoso))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, resultado_tetris))
