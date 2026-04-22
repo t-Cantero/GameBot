@@ -620,14 +620,7 @@ function endGame() {
 function sendData() {
     if (tg?.sendData) {
         tg.sendData(JSON.stringify(window.finalData));
-
-        setTimeout(() => {
-          tg.close();
-        },500);
-    } else {
-        alert("ERROR: tg.sendData no disponible");
     }
-
 }
 </script>
 </body>

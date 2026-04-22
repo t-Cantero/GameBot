@@ -234,28 +234,37 @@ async def verificar_y_jugar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user    = query.from_user
+    user = query.from_user
     usuario = get_usuario(user.id, user.username or user.first_name)
-    vidas   = usuario["vidas"]
+    vidas = usuario["vidas"]
 
     if vidas <= 0:
         tiempo = tiempo_proxima_vida(usuario)
-        await query.message.reply_text(
+        await query.message.edit_text(
             f"💀 *¡Sin vidas!*\n\n"
             f"⏳ Próxima vida en: *{tiempo}*\n\n"
             f"Compra más para seguir jugando:",
             parse_mode="Markdown",
             reply_markup=teclado_sin_vidas()
         )
-    else:
-        await query.message.reply_text(
-            f"❤️ Vidas: *{vidas}* — ¡Buena suerte!",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🎮 Abrir Tetris", web_app=WebAppInfo(url=TETRIS_URL))
-            ]])
-        )
+        return
 
+    # Edita mensaje original
+    await query.message.edit_text(
+        f"🎮 ¡Buena suerte, {user.first_name}! ❤️ x{vidas}",
+        parse_mode="Markdown"
+    )
+
+    # Mensaje del juego (este es el que luego editamos)
+    msg = await query.message.reply_text(
+        "▶️ Pulsa para jugar:",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🎮 Abrir Tetris", web_app=WebAppInfo(url=TETRIS_URL))
+        ]])
+    )
+
+    # Guardar ID para actualizar después
+    context.user_data["tetris_msg_id"] = msg.message_id
 async def vidas_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user    = update.effective_user
     usuario = get_usuario(user.id, user.username or user.first_name)
@@ -278,28 +287,31 @@ async def vidas_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def resultado_tetris(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+
     try:
-        data   = json.loads(update.message.web_app_data.data)
+        data = json.loads(update.message.web_app_data.data)
         score  = data.get("score", 0)
         tiempo = data.get("tiempo", "00:00")
         nivel  = data.get("nivel", 1)
         lineas = data.get("lineas", 0)
-    except (json.JSONDecodeError, KeyError) as e:
-        logger.error(f"Error procesando datos del juego: {e}")
-        await update.message.reply_text("❌ Error al recibir los datos del juego.")
+    except Exception as e:
+        logger.error(f"Error procesando datos: {e}")
         return
 
-    usuario     = get_usuario(user.id, user.username or user.first_name)
+    usuario = get_usuario(user.id, user.username or user.first_name)
+
+    # 🔒 Seguridad: evitar jugar sin vidas
+    if usuario["vidas"] <= 0:
+        await update.message.reply_text("❌ No tienes vidas.")
+        return
+
     vidas_antes = usuario["vidas"]
     nuevas_vidas = max(0, vidas_antes - 1)
 
-    # Guardar timestamp solo si se pierde una vida (para la regeneración)
-    set_vidas(user.id, nuevas_vidas, guardar_timestamp=(nuevas_vidas < VIDAS_MAX))
+    set_vidas(user.id, nuevas_vidas, guardar_timestamp=True)
     registrar_partida(user.id, score)
 
-    logger.info(f"Game over de {user.first_name} | score={score} | vidas {vidas_antes}→{nuevas_vidas}")
-
-    # Info de regeneración
+    # Info regeneración
     info_regeneracion = ""
     if nuevas_vidas < VIDAS_MAX:
         usuario_actualizado = get_usuario(user.id)
@@ -309,29 +321,48 @@ async def resultado_tetris(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = (
         f"🎮 *Partida de {user.first_name}*\n"
         f"━━━━━━━━━━━━━━\n"
-        f"⭐ Score:  `{score}`\n"
+        f"⭐ Score: `{score}`\n"
         f"⏱️ Tiempo: `{tiempo}`\n"
-        f"📈 Nivel:  `{nivel}`\n"
+        f"📈 Nivel: `{nivel}`\n"
         f"✅ Líneas: `{lineas}`\n"
         f"━━━━━━━━━━━━━━\n"
         f"❤️ Vidas restantes: *{nuevas_vidas}*"
         f"{info_regeneracion}"
     )
 
-    if nuevas_vidas > 0:
-        await update.message.reply_text(
-            texto,
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔄 Jugar de nuevo", web_app=WebAppInfo(url=TETRIS_URL))
-            ]])
-        )
-    else:
-        await update.message.reply_text(
-            texto + "\n\n💀 *¡Sin vidas!* Compra más o espera a que se regeneren:",
-            parse_mode="Markdown",
-            reply_markup=teclado_sin_vidas()
-        )
+    chat_id = update.effective_chat.id
+    msg_id = context.user_data.get("tetris_msg_id")
+
+    try:
+        if msg_id:
+            if nuevas_vidas > 0:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=msg_id,
+                    text=texto,
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔄 Jugar de nuevo", callback_data="jugar_tetris")
+                    ]])
+                )
+            else:
+                await context.bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=msg_id,
+                    text=texto + "\n\n💀 *¡Sin vidas!*",
+                    parse_mode="Markdown",
+                    reply_markup=teclado_sin_vidas()
+                )
+        else:
+            # fallback
+            await update.message.reply_text(texto, parse_mode="Markdown")
+
+    except Exception as e:
+        logger.error(f"Error editando mensaje: {e}")
+        await update.message.reply_text(texto, parse_mode="Markdown")
+
+    # limpiar id (muy importante)
+    context.user_data.pop("tetris_msg_id", None)
 
 
 # ── Botón de compra pulsado ───────────────────────────────────────────────────
@@ -397,7 +428,7 @@ async def pago_exitoso(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"¡A jugar!",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🎮 Jugar ahora", web_app=WebAppInfo(url=TETRIS_URL))
+            InlineKeyboardButton("🎮 Jugar ahora", callback_data="jugar_tetris")
         ]])
     )
 
