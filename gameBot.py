@@ -178,7 +178,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(texto, reply_markup=teclado())
 
-
 # ─────────────────────────────
 # BOTÓN JUGAR (CONTROL REAL)
 # ─────────────────────────────
